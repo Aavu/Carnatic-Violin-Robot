@@ -1,50 +1,55 @@
 //
 // Created by Raghavasimhan Sankaranarayanan on 2020-01-14.
 //
+#include <cstring>
+#include <fstream>
+#include <iostream>
 
 #include "Violinist.h"
+#include "PitchFileParser.h"
+
+#define TRANSPOSE 2
+
+//#define SET_HOME
 
 using namespace std;
 
-//#define SET_HOME
-//#define USE_FINGER
+int main(int argc, char **argv) {
+    Error_t lResult = kNoError;
+    PitchFileParser pitchFileParser;
+    pitchFileParser.Set("pitches.txt");
+    size_t length = 0;
+    lResult = pitchFileParser.GetLength(length, lResult);
+    std::unique_ptr<double> pitches(new double[length]);
+    lResult = pitchFileParser.GetPitches(pitches.get(), lResult);
 
-int main(int argc, char** argv) {
-    Error_t lResult;
+    if (lResult != kNoError)
+        return 1;
+
+    cout << "Read pitches successfully!\n";
+
     Violinist violinist;
 
-    float fretPosition = 0; // 0 - 16
-
 #ifdef SET_HOME
-    if ((lResult = violinist.Prepare(&fretPosition, true)) != kNoError) {
-#else
-    if ((lResult = violinist.Prepare(&fretPosition)) != kNoError) {
-#endif //SET_HOME
-        violinist.LogError("Main Prepare", lResult, violinist.GetErrorCode());
+    if ((lResult = violinist.Init(true)) != kNoError) {
+        violinist.LogError("Main Init", lResult, violinist.GetErrorCode());
         return lResult;
     }
 
-//    violinist.finger->on();
-    float i = 0;
-    while(i < 10) {
-        fretPosition = i;
-        std::this_thread::sleep_for(std::chrono::microseconds (500));
-        i += 0.01;
+    if ((lResult = violinist.CloseDevice()) != kNoError) {
+        violinist.LogError("CloseDevice", lResult, violinist.GetErrorCode());
+        return lResult;
     }
-
-    while(i > 0) {
-        fretPosition = i;
-        std::this_thread::sleep_for(std::chrono::microseconds (500));
-        i -= 0.01;
+    return 0;
+#else
+    if ((lResult = violinist.Init()) != kNoError) {
+        violinist.LogError("Main Init", lResult, violinist.GetErrorCode());
+        return lResult;
     }
+#endif //SET_HOME
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-//    violinist.finger->rest();
-
-//    if ((lResult = violinist.Play()) != kNoError) {
-//        violinist.LogError("Play", lResult, violinist.GetErrorCode());
-//        return lResult;
-//    }
+//    violinist.Perform(pitches.get(), length, TRANSPOSE);
+    violinist.Perform(Violinist::Key::C, Violinist::Mode::Dorian, 1000, 0.5);
 
     if ((lResult = violinist.CloseDevice()) != kNoError) {
         violinist.LogError("CloseDevice", lResult, violinist.GetErrorCode());

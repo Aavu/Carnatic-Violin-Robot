@@ -7,8 +7,10 @@ enum Error_t
 
     kFileOpenError,
     kFileAccessError,
+    kFileWriteError,
 
     kFunctionInvalidArgsError,
+    kFunctionExecOrderError,
 
     kNotInitializedError,
     kFunctionIllegalCallError,

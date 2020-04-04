@@ -16,7 +16,9 @@
 
 #include "Definitions.h"
 #include "MyDefinitions.h"
-#include "Finger.h"
+#include "FingerController.h"
+#include "CommHandler.h"
+#include "BowController.h"
 
 using namespace std;
 
@@ -25,13 +27,26 @@ typedef int BOOL;
 
 class Violinist {
 public:
+
+    enum Key {
+        C, C_sharp, D, D_sharp, E, F, F_sharp, G, G_sharp, A, A_sharp, B
+    };
+
+    enum Mode {
+        Major, Minor, Dorian, Lydian
+    };
+
     Violinist();
     ~Violinist();
 
     Error_t OpenDevice();
-    Error_t Prepare(float* fretPos, bool shouldHome = false);
+    Error_t Init(bool shouldHome = false);
     Error_t CloseDevice();
-//    Error_t Play();
+
+    Error_t Perform(const double* pitches, const size_t& length, short transpose=0);
+    Error_t Perform(Key key, Mode mode, int interval_ms, float amplitude, short transpose=0);
+
+    static Error_t GetPositionsForScale(float* positions, Key key, Mode mode, short transpose=0);
 
     void TrackEncoderPosition();
     void TrackTargetPosition();
@@ -42,33 +57,10 @@ public:
     unsigned int GetErrorCode();
     int GetPosition();
 
-#ifdef USE_FINGER
-    Finger* finger;
-#endif
-
 private:
-    int iRTPosition = 0;
-    int iTimeInterval = 1; //ms
-    float *p_fFretPosition = nullptr;
-    float fPrevFretPosition = 0;
-    unsigned int ulErrorCode = 0;
-
-    unsigned int set_maxErr = 20000;
-
-    bool b_stopPositionUpdates;
-
-    HANDLE g_pKeyHandle = nullptr;
-    unsigned short g_usNodeId = 6;
-    string g_deviceName;
-    string g_protocolStackName;
-    string g_interfaceName;
-    string g_portName;
-    int g_baudrate = 0;
-
-    const string g_programName = "Violinist";
     void SetDefaultParameters();
-    static double FretLength(uint8_t fretNumber);
-    static long PositionToPulse(double p);
+    static double FretLength(double fretNumber);
+    long PositionToPulse(double p);
 
     Error_t UpdateEncoderPosition();
     Error_t UpdateTargetPosition();
@@ -77,8 +69,39 @@ private:
 
     Error_t MoveToPosition(long targetPos);
     Error_t RawMoveToPosition(int _pos, unsigned int _acc, BOOL _absolute);
-    unsigned int GetAcceleration();
-    static long convertToTargetPosition(float fretPos);
+    long ConvertToTargetPosition(double fretPos);
+
+    int m_iRTPosition;
+
+    const string g_programName = "Violinist";
+    int m_iTimeInterval = 25; //ms
+
+    double m_pfFretPosition = 0;
+
+    unsigned int ulErrorCode = 0;
+
+    unsigned int m_ulMaxFollowErr = 20000;
+
+    bool m_bStopPositionUpdates;
+
+    HANDLE g_pKeyHandle = nullptr;
+    unsigned short g_usNodeId = 1;
+    string g_deviceName;
+    string g_protocolStackName;
+    string g_interfaceName;
+    string g_portName;
+    int g_baudrate = 0;
+
+    short m_iEncoderDirection = 1;
+
+    // Communication Handler
+    CommHandler* m_commHandler;
+
+    // Bowing
+    BowController* m_bowController;
+
+    // Fingering
+    FingerController* m_fingerController;
 };
 
 
