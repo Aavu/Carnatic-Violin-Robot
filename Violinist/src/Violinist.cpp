@@ -137,9 +137,6 @@ Error_t Violinist::Init(bool shouldHome) {
 //        return lResult;
 //    }
 
-    TrackEncoderPosition();
-    TrackTargetPosition();
-
     if (VCS_SetMaxFollowingError(g_pKeyHandle, g_usNodeId, m_ulMaxFollowErr, &ulErrorCode) == 0) {
         lResult = kGetValueError;
         LogError("VCS_GetMaxFollowingError", lResult, ulErrorCode);
@@ -185,10 +182,13 @@ Error_t Violinist::Init(bool shouldHome) {
         return lResult;
     }
 
-    if ((lResult = m_fingerController->Init(m_commHandler, &m_iRTPosition)) != kNoError) {
+    if ((lResult = m_fingerController->Init(m_commHandler)) != kNoError) {
         LogError("FingerInitError", lResult, ulErrorCode);
         return lResult;
     }
+
+//    TrackEncoderPosition();
+    TrackTargetPosition();
 
     return kNoError;
 }
@@ -233,6 +233,7 @@ void Violinist::LogError(const string &functionName, int p_lResult, unsigned int
 Error_t Violinist::MoveToPosition(long targetPos) {
     Error_t lResult = kNoError;
     if (std::abs(targetPos) < std::abs(MAX_ENCODER_INC) && std::abs(targetPos) >= std::abs(NUT_POSITION)) {
+        m_fingerController->UpdatePosition(std::abs(targetPos));
         if (VCS_SetPositionMust(g_pKeyHandle, g_usNodeId, targetPos, &ulErrorCode) == 0) {
             lResult = kSetValueError;
             LogError("VCS_SetPositionMust", lResult, ulErrorCode);
@@ -250,10 +251,12 @@ long Violinist::PositionToPulse(double p) {
 }
 
 Error_t Violinist::UpdateEncoderPosition() {
-    if (VCS_GetPositionIs(g_pKeyHandle, g_usNodeId, &m_iRTPosition, &ulErrorCode) == 0)
+    if (VCS_GetPositionIs(g_pKeyHandle, g_usNodeId, &m_iRTPosition, &ulErrorCode) == 0) {
+        std::cerr << "get value error...\n";
         return kGetValueError;
+    }
 
-    m_fingerController->UpdatePosition();
+//    m_fingerController->UpdatePosition();
 //    cout << m_iRTPosition << endl;
     return kNoError;
 }

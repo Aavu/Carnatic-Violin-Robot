@@ -5,7 +5,7 @@
 #ifndef VIOLINIST_BOWCONTROLLER_H
 #define VIOLINIST_BOWCONTROLLER_H
 
-#include "MyDefinitions.h"
+#include "../../include/MyDefinitions.h"
 #include "CommHandler.h"
 
 using std::string;

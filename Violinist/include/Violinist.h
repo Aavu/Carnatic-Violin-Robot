@@ -15,10 +15,12 @@
 #include <sstream>
 
 #include "Definitions.h"
-#include "MyDefinitions.h"
+#include "../../include/MyDefinitions.h"
 #include "FingerController.h"
 #include "CommHandler.h"
 #include "BowController.h"
+
+#include "Tuner.h"
 
 using namespace std;
 
@@ -74,7 +76,7 @@ private:
     int m_iRTPosition;
 
     const string g_programName = "Violinist";
-    int m_iTimeInterval = 25; //ms
+    int m_iTimeInterval = 100; //ms
 
     double m_pfFretPosition = 0;
 

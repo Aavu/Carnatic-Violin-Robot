@@ -5,6 +5,7 @@
 #include "PitchFileParser.h"
 
 PitchFileParser::PitchFileParser() : m_iLength(0), m_bSetPath(false), m_fPitches(nullptr) {
+
 }
 
 PitchFileParser::~PitchFileParser() {
@@ -17,7 +18,12 @@ PitchFileParser::~PitchFileParser() {
 Error_t PitchFileParser::Set(const string& filePath, const Error_t& error) {
     if (error != kNoError)
         return error;
-    m_file.open(filePath);
+    m_sFilePath = filePath;
+    m_file.open(m_sFilePath);
+    if (!m_file.is_open()) {
+        std::cerr << "Failed to open " << m_sFilePath << endl;
+        return kFileOpenError;
+    }
     m_bSetPath = true;
     return kNoError;
 }
@@ -26,7 +32,10 @@ Error_t PitchFileParser::readSize() {
     if (!m_bSetPath)
         return kNotInitializedError;
     string header;
-    std::getline(m_file, header);
+    if (!std::getline(m_file, header)) {
+        std::cerr << "Failed to read line\n";
+        return kUnknownError;
+    }
     m_iLength = stoi(header.substr(2, header.size()));
     return kNoError;
 }
@@ -46,8 +55,10 @@ Error_t PitchFileParser::readPitches() {
 
     for (size_t i = 0; i < m_iLength; i++) {
         string value;
-        std::getline(m_file, value);
-        m_fPitches[i] = stod(value);
+        if (std::getline(m_file, value))
+            m_fPitches[i] = stod(value);
+        else
+            return kUnknownError;
     }
 
     return kNoError;
@@ -81,9 +92,9 @@ Error_t PitchFileParser::GetPitches(double *pitches, const size_t &length, const
 Error_t PitchFileParser::GetLength(size_t& length, const Error_t& error) {
     if (error != kNoError)
         return error;
-
     if (!m_iLength) {
         auto err = readSize();
+
         if (err != kNoError)
             return err;
     }

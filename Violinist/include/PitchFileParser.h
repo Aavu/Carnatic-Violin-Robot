@@ -5,7 +5,7 @@
 #ifndef VIOLINIST_PITCHFILEPARSER_H
 #define VIOLINIST_PITCHFILEPARSER_H
 
-#include "MyDefinitions.h"
+#include "../../include/MyDefinitions.h"
 #include <fstream>
 #include <memory>
 
@@ -30,6 +30,7 @@ private:
 
     size_t m_iLength;
     ifstream m_file;
+    string m_sFilePath;
     bool m_bSetPath;
 
 //    std::unique_ptr<double>(m_fPitches);

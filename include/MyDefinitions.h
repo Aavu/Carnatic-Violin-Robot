@@ -25,7 +25,7 @@
 
 static const float SCALE_LENGTH = 304.5;  //mm
 static const int MAX_ENCODER_INC = 23000;
-static const int MAX_ALLOWED_VALUE = 20000;
+static const int MAX_ALLOWED_VALUE = 18000;
 static const int NUT_POSITION = 1000; //-1600 without block bolt
 static const int OPEN_STRING = NUT_POSITION;
 

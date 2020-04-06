@@ -11,7 +11,7 @@
 #define TRANSPOSE 2
 
 //#define SET_HOME
-
+ 
 using namespace std;
 
 int main(int argc, char **argv) {
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 #endif //SET_HOME
 
 //    violinist.Perform(pitches.get(), length, TRANSPOSE);
-    violinist.Perform(Violinist::Key::C, Violinist::Mode::Dorian, 1000, 0.5);
+    violinist.Perform(Violinist::Key::C_sharp, Violinist::Mode::Minor, 1000, 0);
 
     if ((lResult = violinist.CloseDevice()) != kNoError) {
         violinist.LogError("CloseDevice", lResult, violinist.GetErrorCode());
