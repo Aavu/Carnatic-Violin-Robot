@@ -5,8 +5,9 @@
 #ifndef VIOLINIST_BOWCONTROLLER_H
 #define VIOLINIST_BOWCONTROLLER_H
 
-#include "../../include/MyDefinitions.h"
+#include "MyDefinitions.h"
 #include "CommHandler.h"
+#include "Util.h"
 
 using std::string;
 using std::cout;
@@ -14,11 +15,12 @@ using std::endl;
 
 class BowController {
 public:
-#define MIN_PITCH 175
-#define MAX_PITCH 215
+#define MIN_PITCH 178
+#define MAX_PITCH 220
 #define MIN_VELOCITY 72
-#define MAX_VELOCITY 115
+#define MAX_VELOCITY 120
 
+    inline static const std::string kName = "BowController";
     enum State {
         Playing,
         Stopped

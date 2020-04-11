@@ -15,10 +15,11 @@
 #include <sstream>
 
 #include "Definitions.h"
-#include "../../include/MyDefinitions.h"
+#include "MyDefinitions.h"
 #include "FingerController.h"
 #include "CommHandler.h"
 #include "BowController.h"
+#include "Util.h"
 
 #include "Tuner.h"
 
@@ -29,13 +30,13 @@ typedef int BOOL;
 
 class Violinist {
 public:
-
+    inline static const std::string kName = "Violinist";
     enum Key {
         C, C_sharp, D, D_sharp, E, F, F_sharp, G, G_sharp, A, A_sharp, B
     };
 
     enum Mode {
-        Major, Minor, Dorian, Lydian
+        Major, Minor, Dorian, Lydian, SingleNote
     };
 
     Violinist();
@@ -48,13 +49,13 @@ public:
     Error_t Perform(const double* pitches, const size_t& length, short transpose=0);
     Error_t Perform(Key key, Mode mode, int interval_ms, float amplitude, short transpose=0);
 
-    static Error_t GetPositionsForScale(float* positions, Key key, Mode mode, short transpose=0);
+    static Error_t GetPositionsForScale(std::unique_ptr<float[]>& positions, Key key, Mode mode, short transpose=0);
 
     void TrackEncoderPosition();
     void TrackTargetPosition();
 
     static void LogInfo(const string& message);
-    void LogError(const string& functionName, int p_lResult, unsigned int p_ulErrorCode);
+    static void LogError(const string& functionName, Error_t p_lResult, unsigned int p_ulErrorCode);
 
     unsigned int GetErrorCode();
     int GetPosition();
@@ -75,7 +76,6 @@ private:
 
     int m_iRTPosition;
 
-    const string g_programName = "Violinist";
     int m_iTimeInterval = 100; //ms
 
     double m_pfFretPosition = 0;
@@ -85,6 +85,7 @@ private:
     unsigned int m_ulMaxFollowErr = 20000;
 
     bool m_bStopPositionUpdates;
+    bool m_bShouldHome = false;
 
     HANDLE g_pKeyHandle = nullptr;
     unsigned short g_usNodeId = 1;
@@ -104,6 +105,9 @@ private:
 
     // Fingering
     FingerController* m_fingerController;
+
+    // Tuner
+    CTuner* m_pCTuner;
 };
 
 

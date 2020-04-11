@@ -17,6 +17,8 @@ using std::ifstream;
 
 class PitchFileParser {
 public:
+    inline static const std::string kName = "PitchFileParser";
+
     PitchFileParser();
     ~PitchFileParser();
 

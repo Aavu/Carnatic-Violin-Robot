@@ -19,6 +19,8 @@ enum Error_t
     kGetValueError,
     kSetValueError,
 
+    kOutOfBoundsError,
+
     kMemError,
 
     kUnknownError,

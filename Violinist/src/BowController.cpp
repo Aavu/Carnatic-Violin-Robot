@@ -18,8 +18,10 @@ Error_t BowController::Create(BowController *&pCInstance) {
 Error_t BowController::Destroy(BowController *&pCInstance) {
     auto err = kNoError;
     pCInstance->StopBowing(err);
-    if (err != kNoError)
+    if (err != kNoError) {
+        CUtil::PrintError(__PRETTY_FUNCTION__, err);
         return err;
+    }
     delete pCInstance;
     return kNoError;
 }
@@ -76,8 +78,10 @@ Error_t BowController::StartBowing(float amplitude, Bow::Direction direction, Er
 
     err = Send(Register::kRollerEnable, 1, err);
 
-    if (err != kNoError)
+    if (err != kNoError) {
+        std::cerr << "Error sending kRollerEnable\n";
         return err;
+    }
 
     m_bowingState = Playing;
 

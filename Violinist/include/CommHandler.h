@@ -16,6 +16,8 @@ using std::string;
 
 class CommHandler {
 public:
+    inline static const std::string kName = "CommHandler";
+
     static Error_t Create(CommHandler*& pCInstance) {
         pCInstance = new CommHandler();
         if (!pCInstance)

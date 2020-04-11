@@ -23,7 +23,7 @@
 #define MMC_FAILED 1
 #endif
 
-static const float SCALE_LENGTH = 304.5;  //mm
+static const float SCALE_LENGTH = 300;  //mm
 static const int MAX_ENCODER_INC = 23000;
 static const int MAX_ALLOWED_VALUE = 18000;
 static const int NUT_POSITION = 1000; //-1600 without block bolt

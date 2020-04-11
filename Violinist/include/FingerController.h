@@ -17,16 +17,17 @@ using std::cerr;
 using std::endl;
 
 class FingerController {
+    inline static const std::string kName = "FingerController";
     enum State {
         OFF = 0,
         ON,
         REST
     };
 
-    const uint8_t OFF_MAX = 180;
-    const uint8_t ON_MAX = 145;
-    const uint8_t ON_MIN = 115;
-    const uint8_t OFF_MIN = 135;
+    const uint8_t OFF_MAX = 125;
+    const uint8_t ON_MAX = 90;
+    const uint8_t ON_MIN = 90;
+    const uint8_t OFF_MIN = 110;
 
     uint8_t prevSentValue;
     bool m_bInitialized;
