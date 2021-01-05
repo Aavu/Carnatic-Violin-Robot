@@ -8,7 +8,6 @@ CTuner::CTuner() {
 }
 
 CTuner::~CTuner() {
-    Reset();
 }
 
 Error_t CTuner::Create(CTuner *&pCInstance) {
@@ -116,7 +115,7 @@ Error_t CTuner::Process() {
     m_fNote = n;
     m_fCorrection = c;
     std::cout << m_fNote << std::endl;
-//    std::cout << "output: " << m_fNote << std::endl;
+//    std::cout << "output: " << m_fNote << " , correction: " << m_fCorrection << std::endl;
     return kNoError;
 }
 
@@ -180,7 +179,7 @@ Error_t CTuner::getNote(float& note, float& correction) {
 //    std::cout << "ref: " << ref << "\tnote : " << note << "\trangeID: " << rangeID << "\tCorrection: " << correction;
     if (std::abs(correction) > bandwidth*2) {
         note = -1;
-        CUtil::PrintMessage(__PRETTY_FUNCTION__, "Out of Bounds");
+//        CUtil::PrintMessage(__PRETTY_FUNCTION__, "Out of Bounds");
     }
 
     return kNoError;

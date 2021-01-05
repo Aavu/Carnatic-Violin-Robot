@@ -10,6 +10,12 @@ BowController::BowController() :    m_bInitialized(false),
                                     m_iBowSpeed(0), m_fBowPressure(0), m_currentDirection(Bow::Down), m_currentBowPitch(MIN_PITCH),
                                     m_iRTPosition(nullptr) {}
 
+
+BowController::~BowController()
+{
+
+}
+
 Error_t BowController::Create(BowController *&pCInstance) {
     pCInstance = new BowController();
     return kNoError;
@@ -84,7 +90,7 @@ Error_t BowController::StartBowing(float amplitude, Bow::Direction direction, Er
     }
 
     m_bowingState = Playing;
-
+    positionTrackThread = std::thread(&BowController::updateSurge, this);
     return kNoError;
 }
 
@@ -98,6 +104,8 @@ Error_t BowController::StopBowing(Error_t error) {
     if (err != kNoError)
         return err;
     m_bowingState = Stopped;
+    if (positionTrackThread.joinable())
+        positionTrackThread.join();
     return kNoError;
 }
 
@@ -183,4 +191,25 @@ Error_t BowController::SetDirection(Bow::Direction direction) {
     if (m_bowingState == Playing)
         return SetAmplitude(m_currentAmplitude);
     return kNoError;
+}
+
+Error_t BowController::ResumeBowing(Error_t error) {
+    error = Send(Register::kRollerEnable, 1, error);
+    if (error != kNoError)
+        m_bowingState = Playing;
+    return error;
+}
+
+Error_t BowController::PauseBowing(Error_t error) {
+    error = Send(Register::kRollerEnable, 0, error);
+    if (error != kNoError)
+        m_bowingState = Paused;
+    return error;
+}
+
+void BowController::updateSurge()
+{
+    while (m_bowingState == Playing) {
+
+    }
 }

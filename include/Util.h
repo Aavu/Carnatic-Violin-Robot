@@ -84,7 +84,7 @@ public:
 
     static void PrintError(const std::string& objName, Error_t err) {
         auto cErr = GetErrorString(err);
-        std::cerr << cErr << " (" << objName << ")\n";
+        std::cerr << objName << " failed (" << cErr << ")\n";
     }
 
     static std::string GetErrorString(Error_t err) {

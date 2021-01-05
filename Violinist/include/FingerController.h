@@ -24,11 +24,6 @@ class FingerController {
         REST
     };
 
-    const uint8_t OFF_MAX = 125;
-    const uint8_t ON_MAX = 90;
-    const uint8_t ON_MIN = 90;
-    const uint8_t OFF_MIN = 110;
-
     uint8_t prevSentValue;
     bool m_bInitialized;
 

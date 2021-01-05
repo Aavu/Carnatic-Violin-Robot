@@ -63,7 +63,7 @@ private:
     int iBufferSizePerFrame = iBufferFrames * iNumChannels;
     int iBufferSize = iBufferSizePerFrame * iFramesPerFFT;
 
-    unsigned int m_ulSampleRate = 4000;
+    unsigned int m_ulSampleRate = 2000;
     int m_iZeroPaddingFactor = 16;
     int m_iFftLength = iBufferSize * m_iZeroPaddingFactor;
     int m_iMagLength = 0;

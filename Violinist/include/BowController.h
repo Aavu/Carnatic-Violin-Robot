@@ -15,18 +15,15 @@ using std::endl;
 
 class BowController {
 public:
-#define MIN_PITCH 178
-#define MAX_PITCH 220
-#define MIN_VELOCITY 72
-#define MAX_VELOCITY 120
-
     inline static const std::string kName = "BowController";
     enum State {
         Playing,
+        Paused,
         Stopped
     };
 
     BowController();
+    ~BowController();
 
     static Error_t Create(BowController*& pCInstance);
     static Error_t Destroy(BowController*& pCInstance);
@@ -36,6 +33,8 @@ public:
 
     Error_t StartBowing(float amplitude = .5, Bow::Direction direction = Bow::Down, Error_t error = kNoError);
     Error_t StopBowing(Error_t error = kNoError);
+    Error_t ResumeBowing(Error_t error = kNoError);
+    Error_t PauseBowing(Error_t error = kNoError);
     Error_t BowOnString(bool on = true, Error_t error = kNoError);
     Error_t SetAmplitude(float amplitude, Error_t error = kNoError);
     Error_t SetSpeed(Bow::Direction direction, uint8_t bowSpeed, Error_t error = kNoError);
@@ -51,6 +50,8 @@ private:
     static uint8_t TransformPressure(float pressure);
     static uint8_t TransformVelocity(float velocity);
 
+    void updateSurge();
+
     bool m_bInitialized;
     CommHandler* m_commHandler;
     State m_bowingState;
@@ -60,8 +61,11 @@ private:
     Bow::Direction m_currentDirection;
     uint8_t m_currentBowPitch;
     float m_currentAmplitude;
+    uint8_t m_currentSurge;
 
     int* m_iRTPosition;
+
+    std::thread positionTrackThread;
 };
 
 #endif //VIOLINIST_BOWCONTROLLER_H
