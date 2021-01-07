@@ -29,7 +29,7 @@ public:
     static Error_t Create(CTuner*& pCInstance);
     static Error_t Destroy(CTuner*& pCInstance);
 
-    Error_t Init(double* fretPosition);
+    Error_t Init(float* fretPosition);
     Error_t Reset();
 
     Error_t Start();
@@ -77,7 +77,7 @@ private:
 
     constexpr static const double bandwidth = .5;
 
-    double* m_fFretPosition = nullptr;
+    float* m_fFretPosition = nullptr;
     int m_iFretToNoteTransform = 3;
 };
 

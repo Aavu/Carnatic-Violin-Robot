@@ -14,7 +14,7 @@
 #include <thread>
 #include <sstream>
 
-#include "Definitions.h"
+#include "EposController.h"
 #include "MyDefinitions.h"
 #include "FingerController.h"
 #include "CommHandler.h"
@@ -57,9 +57,9 @@ public:
     Violinist();
     ~Violinist();
 
-    Error_t OpenDevice();
+//    Error_t OpenDevice();
     Error_t Init(bool shouldHome = true, bool usePitchCorrection = false);
-    Error_t CloseDevice();
+//    Error_t CloseDevice();
 
     Error_t Perform(const double* pitches, const size_t& length, short transpose=0);
     Error_t Perform(Key key, Mode mode, int interval_ms, float amplitude, short transpose=0);
@@ -75,15 +75,15 @@ public:
     static void LogInfo(const string& message);
     static void LogError(const string& functionName, Error_t p_lResult, unsigned int p_ulErrorCode);
 
-    [[nodiscard]] unsigned int GetErrorCode() const;
-    int GetPosition();
+//    [[nodiscard]] unsigned int GetErrorCode() const;
+//    int GetPosition();
 
 private:
-    void SetDefaultParameters();
+//    void SetDefaultParameters();
     void SetupTuner();
 
     // Gamakas
-    Error_t PerformSpurita(int interval_ms, float amplitude);
+    Error_t PerformSpurita(int exampleNumber, int interval_ms, float amplitude);
     Error_t PerformJaaru(int interval_ms, float amplitude);
     Error_t PerformNokku(int interval_ms, float amplitude);
     Error_t PerformOdukkal(int interval_ms, float amplitude);
@@ -92,28 +92,28 @@ private:
     Error_t PerformVali(int interval_ms, float amplitude);
     Error_t PerformKampita(int exampleNumber, int interval_ms, float amplitude);
 
-    static double FretLength(double fretNumber);
-    [[nodiscard]] long PositionToPulse(double p) const;
+//    static double FretLength(double fretNumber);
+//    [[nodiscard]] long PositionToPulse(double p) const;
 
     Error_t UpdateEncoderPosition();
     Error_t UpdateTargetPosition();
-
-    Error_t SetHome();
-
-    Error_t MoveToPosition(long targetPos);
-    Error_t RawMoveToPosition(int _pos, unsigned int _acc, BOOL _absolute);
-    long ConvertToTargetPosition(double fretPos);
-
-    Error_t ActivatePositionMode();
-    Error_t ActivateProfilePositionMode(unsigned int uiVelocity = 2500, unsigned int uiAcc = 10000);
+//
+//    Error_t SetHome();
+//
+//    Error_t MoveToPosition(long targetPos);
+//    Error_t RawMoveToPosition(int _pos, unsigned int _acc, BOOL _absolute);
+//    long ConvertToTargetPosition(double fretPos);
+//
+//    Error_t ActivatePositionMode();
+//    Error_t ActivateProfilePositionMode(unsigned int uiVelocity = 2500, unsigned int uiAcc = 10000);
 
     void PitchCorrect();
 
     int m_iRTPosition;
 
-    int m_iTimeInterval = 100; //ms
+    int m_iTimeInterval = 10; //ms
 
-    double m_pfFretPosition = 0;
+    float m_fFretPosition = 0;
 
     unsigned int ulErrorCode = 0;
 
@@ -126,21 +126,22 @@ private:
     bool m_bInterruptPitchCorrection = false;
 
     std::thread positionTrackThread;
+    std::thread encoderTrackThread;
 
     HANDLE g_pKeyHandle = nullptr;
     unsigned short g_usNodeId = 1;
-    string g_deviceName;
-    string g_protocolStackName;
-    string g_interfaceName;
-    string g_portName;
-    int g_baudrate = 0;
+//    string g_deviceName;
+//    string g_protocolStackName;
+//    string g_interfaceName;
+//    string g_portName;
+//    int g_baudrate = 0;
 
-    short m_iEncoderDirection = 1;
+//    short m_iEncoderDirection = 1;
 
     OperationMode m_operationMode = Position;
 
     // Communication Handler
-    CommHandler* m_commHandler;
+    CommHandler* m_pCommHandler;
 
     // Bowing
     BowController* m_pBowController;

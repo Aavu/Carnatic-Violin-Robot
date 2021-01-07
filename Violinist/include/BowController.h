@@ -5,6 +5,7 @@
 #ifndef VIOLINIST_BOWCONTROLLER_H
 #define VIOLINIST_BOWCONTROLLER_H
 
+#include "EposController.h"
 #include "MyDefinitions.h"
 #include "CommHandler.h"
 #include "Util.h"
@@ -33,8 +34,8 @@ public:
 
     Error_t StartBowing(float amplitude = .5, Bow::Direction direction = Bow::Down, Error_t error = kNoError);
     Error_t StopBowing(Error_t error = kNoError);
-    Error_t ResumeBowing(Error_t error = kNoError);
-    Error_t PauseBowing(Error_t error = kNoError);
+//    Error_t ResumeBowing(Error_t error = kNoError);
+//    Error_t PauseBowing(Error_t error = kNoError);
     Error_t BowOnString(bool on = true, Error_t error = kNoError);
     Error_t SetAmplitude(float amplitude, Error_t error = kNoError);
     Error_t SetSpeed(Bow::Direction direction, uint8_t bowSpeed, Error_t error = kNoError);
@@ -50,7 +51,7 @@ private:
     static uint8_t TransformPressure(float pressure);
     static uint8_t TransformVelocity(float velocity);
 
-    void updateSurge();
+//    void updateSurge();
 
     bool m_bInitialized;
     CommHandler* m_commHandler;
@@ -63,9 +64,11 @@ private:
     float m_currentAmplitude;
     uint8_t m_currentSurge;
 
-    int* m_iRTPosition;
+    int* m_piRTPosition;
 
-    std::thread positionTrackThread;
+//    std::thread positionTrackThread;
+
+    EposController m_wheelController;
 };
 
 #endif //VIOLINIST_BOWCONTROLLER_H

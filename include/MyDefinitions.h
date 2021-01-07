@@ -17,6 +17,9 @@
 #include "ErrorDef.h"
 #include "Util.h"
 
+// Error Handling
+#define IGNORE_ERROR
+
 static const float SCALE_LENGTH             = 310;  //mm
 static const int MAX_ENCODER_INC            = 23000;
 static const int MAX_ALLOWED_VALUE          = 20000;
@@ -24,11 +27,15 @@ static const int NUT_POSITION               = 200;
 static const int OPEN_STRING                = NUT_POSITION;
 static const float PITCH_CORRECTION_FACTOR  = 0; //0.001;
 
+static const unsigned int MAX_FOLLOW_ERROR  = 20000;
 // Finger
-#define OFF_MAX 125
-#define ON_MAX 90
-#define ON_MIN 85
-#define OFF_MIN 110
+#define FINGER_OFF 0
+#define FINGER_ON 1
+
+#define FINGER_OFF_MAX 135
+#define FINGER_ON_MAX 95
+#define FINGER_OFF_MIN 105
+#define FINGER_ON_MIN 85
 
 // Bow
 #define MIN_PITCH 178
@@ -36,25 +43,21 @@ static const float PITCH_CORRECTION_FACTOR  = 0; //0.001;
 #define MIN_VELOCITY 72
 #define MAX_VELOCITY 120
 
-#define MIN_SURGE 0
-#define MAX_SURGE 100
+#define BOW_ACCELERATION 5000L
 
 class Register {
 public:
     enum Bow {
-        kRoller = 1,
-        kRollerEnable,
-        kPitch,
-        kSurge,
-        kSurgeMultiplier,
-
-        kNumBowRegisters
+        kPitch = 1
     };
 
     enum Fingering {
-        kFinger,
-
-        kNumFingerRegisters
+        kFinger = 0,
+        kFingerOffMax = 2,
+        kFingerOnMax = 3,
+        kFingerOffMin = 4,
+        kFingerOnMin = 5,
+        kEncoderSetHome = 6,
     };
 };
 

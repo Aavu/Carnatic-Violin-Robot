@@ -21,7 +21,7 @@ Error_t CTuner::Destroy(CTuner *&pCInstance) {
     return kNoError;
 }
 
-Error_t CTuner::Init(double* fretPosition) {
+Error_t CTuner::Init(float* fretPosition) {
     m_fFretPosition = fretPosition;
 
     m_pfBuffer  = new float [iBufferSize];

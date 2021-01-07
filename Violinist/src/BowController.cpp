@@ -4,16 +4,17 @@
 
 #include "BowController.h"
 
-BowController::BowController() :    m_bInitialized(false),
-                                    m_commHandler(nullptr),
-                                    m_bowingState(Stopped),
-                                    m_iBowSpeed(0), m_fBowPressure(0), m_currentDirection(Bow::Down), m_currentBowPitch(MIN_PITCH),
-                                    m_iRTPosition(nullptr) {}
+BowController::BowController() : m_bInitialized(false),
+                                 m_commHandler(nullptr),
+                                 m_bowingState(Stopped),
+                                 m_iBowSpeed(0), m_fBowPressure(0),
+                                 m_currentDirection(Bow::Down), m_currentBowPitch(MIN_PITCH),
+                                 m_currentAmplitude(0), m_currentSurge(0),
+                                 m_piRTPosition(nullptr), m_wheelController("USB1", 2) {}
 
 
 BowController::~BowController()
 {
-
 }
 
 Error_t BowController::Create(BowController *&pCInstance) {
@@ -23,7 +24,7 @@ Error_t BowController::Create(BowController *&pCInstance) {
 
 Error_t BowController::Destroy(BowController *&pCInstance) {
     auto err = kNoError;
-    pCInstance->StopBowing(err);
+    err = pCInstance->StopBowing(err);
     if (err != kNoError) {
         CUtil::PrintError(__PRETTY_FUNCTION__, err);
         return err;
@@ -34,28 +35,35 @@ Error_t BowController::Destroy(BowController *&pCInstance) {
 
 Error_t BowController::Init(CommHandler* commHandler, int* RTPosition) {
     auto err = Reset();
-    m_iRTPosition = RTPosition;
+    if (err != kNoError)
+        return err;
+    m_piRTPosition = RTPosition;
     m_commHandler = commHandler;
     if (m_commHandler)
         m_bInitialized = true;
     else
-        err = kNotInitializedError;
-    return err;
+        return kNotInitializedError;
+
+    err = m_wheelController.Init(EposController::ProfileVelocity);
+    if (err != kNoError)
+        return err;
+
+    return m_wheelController.SetVelocityProfile(BOW_ACCELERATION);
 }
 
 Error_t BowController::SetSpeed(Bow::Direction direction, uint8_t bowSpeed, Error_t error) {
     if (error != kNoError)
         return error;
     m_iBowSpeed = bowSpeed;
-    auto err = kNoError;
     m_currentDirection = direction;
     if (direction == Bow::Up) {
-        err = Send(Register::kRoller, 128 + m_iBowSpeed, err);
-    } else {
-        err = Send(Register::kRoller, 128 - m_iBowSpeed, err);
+        return m_wheelController.MoveWithVelocity(m_iBowSpeed);
+//        err = Send(Register::kRoller, 128 + m_iBowSpeed, err);
     }
-
-    return err;
+//    else {
+//        err = Send(Register::kRoller, 128 - m_iBowSpeed, err);
+//    }
+    return m_wheelController.MoveWithVelocity(-m_iBowSpeed);
 }
 
 /* Pressure of 0 means not touching the string. Pressure of 1.0 means screaching sound */
@@ -82,15 +90,15 @@ Error_t BowController::StartBowing(float amplitude, Bow::Direction direction, Er
     m_currentDirection = direction;
     err = SetAmplitude(amplitude, err);
 
-    err = Send(Register::kRollerEnable, 1, err);
+//    err = Send(Register::kRollerEnable, 1, err);
 
     if (err != kNoError) {
-        std::cerr << "Error sending kRollerEnable\n";
+        std::cerr << "Error setting amplitude" << std::endl;
         return err;
     }
 
     m_bowingState = Playing;
-    positionTrackThread = std::thread(&BowController::updateSurge, this);
+//    positionTrackThread = std::thread(&BowController::updateSurge, this);
     return kNoError;
 }
 
@@ -98,14 +106,15 @@ Error_t BowController::StopBowing(Error_t error) {
     if (error != kNoError)
         return error;
     auto err = kNoError;
-    err = BowOnString(false, err);
-    err = Send(Register::kRoller, 128, err);
-    err = Send(Register::kRollerEnable, 0, err);
+    BowOnString(false, err);
+//    err = Send(Register::kRoller, 128, err);
+//    err = Send(Register::kRollerEnable, 0, err);
+    err = m_wheelController.Halt();
     if (err != kNoError)
         return err;
     m_bowingState = Stopped;
-    if (positionTrackThread.joinable())
-        positionTrackThread.join();
+//    if (positionTrackThread.joinable())
+//        positionTrackThread.join();
     return kNoError;
 }
 
@@ -193,23 +202,30 @@ Error_t BowController::SetDirection(Bow::Direction direction) {
     return kNoError;
 }
 
-Error_t BowController::ResumeBowing(Error_t error) {
-    error = Send(Register::kRollerEnable, 1, error);
-    if (error != kNoError)
-        m_bowingState = Playing;
-    return error;
-}
+//Error_t BowController::ResumeBowing(Error_t error) {
+//    error = Send(Register::kRollerEnable, 1, error);
+//    if (error != kNoError)
+//        m_bowingState = Playing;
+//    return error;
+//}
 
-Error_t BowController::PauseBowing(Error_t error) {
-    error = Send(Register::kRollerEnable, 0, error);
-    if (error != kNoError)
-        m_bowingState = Paused;
-    return error;
-}
+//Error_t BowController::PauseBowing(Error_t error) {
+//    error = Send(Register::kRollerEnable, 0, error);
+//    if (error != kNoError)
+//        m_bowingState = Paused;
+//    return error;
+//}
 
-void BowController::updateSurge()
-{
-    while (m_bowingState == Playing) {
-
-    }
-}
+//void BowController::updateSurge()
+//{
+//    int iPos = 0;
+//    while (m_bowingState == Playing) {
+//        if (iPos == *m_piRTPosition) {
+//            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+//            continue;
+//        }
+//        auto val = iPos * 180.0 / MAX_ALLOWED_VALUE;
+//        Send(Register::kSurge, (int)val);
+//        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+//    }
+//}

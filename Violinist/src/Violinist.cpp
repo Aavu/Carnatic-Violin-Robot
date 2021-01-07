@@ -7,136 +7,116 @@
 Violinist::Violinist(): m_iRTPosition(0),
                         ulErrorCode(0),
                         m_bStopPositionUpdates(false),
-                        m_commHandler(nullptr),
+                        m_pCommHandler(nullptr),
                         m_pBowController(nullptr),
                         m_pFingerController(nullptr),
                         m_pCTuner(nullptr)
 {
-    SetDefaultParameters();
+//    SetDefaultParameters();
 }
 
 Violinist::~Violinist() {
-    Error_t lResult;
-    if ((lResult = CloseDevice()) != kNoError) {
-        Violinist::LogError("CloseDevice", lResult, ulErrorCode);
-    }
-}
+//    Error_t lResult;
+//    if ((lResult = CloseDevice()) != kNoError) {
+//        Violinist::LogError("CloseDevice", lResult, ulErrorCode);
+//    }
 
-void Violinist::SetDefaultParameters() {
-    //USB
-    g_usNodeId = 1;
-    g_deviceName = "EPOS4";
-    g_protocolStackName = "MAXON SERIAL V2";
-    g_interfaceName = "USB";
-    g_portName = "USB0";
-    g_baudrate = 1000000;
-}
+    if (m_pCTuner) m_pCTuner->Stop();
 
-Error_t Violinist::OpenDevice() {
-    Error_t lResult = kNoError;
-    ulErrorCode = 0;
-    char* pDeviceName = new char[255];
-    char* pProtocolStackName = new char[255];
-    char* pInterfaceName = new char[255];
-    char* pPortName = new char[255];
+    m_bStopPositionUpdates = true;
 
-    strcpy(pDeviceName, g_deviceName.c_str());
-    strcpy(pProtocolStackName, g_protocolStackName.c_str());
-    strcpy(pInterfaceName, g_interfaceName.c_str());
-    strcpy(pPortName, g_portName.c_str());
+    if (positionTrackThread.joinable())
+        positionTrackThread.join();
 
-    LogInfo("Open device...");
+    if (encoderTrackThread.joinable())
+        encoderTrackThread.join();
 
-    g_pKeyHandle = VCS_OpenDevice(pDeviceName, pProtocolStackName, pInterfaceName, pPortName, &ulErrorCode);
-
-    if (g_pKeyHandle != nullptr && ulErrorCode == 0) {
-        unsigned int lBaudrate = 0;
-        unsigned int lTimeout = 0;
-
-        if (VCS_GetProtocolStackSettings(g_pKeyHandle, &lBaudrate, &lTimeout, &ulErrorCode) != 0) {
-            if (VCS_SetProtocolStackSettings(g_pKeyHandle, g_baudrate, lTimeout, &ulErrorCode) != 0) {
-                if (VCS_GetProtocolStackSettings(g_pKeyHandle, &lBaudrate, &lTimeout, &ulErrorCode) != 0) {
-                    if (g_baudrate != (int)lBaudrate) {
-                        lResult = kSetValueError;
-                        LogError("VCS_SetProtocolStackSettings", lResult, ulErrorCode);
-                        return lResult;
-                    }
-                }
-            }
+    if (m_pCTuner)
+        if (m_bTunerOn) {
+            m_pCTuner->Reset();
+            CTuner::Destroy(m_pCTuner);
         }
-    } else {
-        g_pKeyHandle = nullptr;
-    }
 
-    delete[] pDeviceName;
-    delete[] pProtocolStackName;
-    delete[] pInterfaceName;
-    delete[] pPortName;
-
-    return lResult;
+    delete m_pFingerController;
+    BowController::Destroy(m_pBowController);
+    delete m_pCommHandler;
 }
+
+//void Violinist::SetDefaultParameters() {
+//    //USB
+//    g_usNodeId = 1;
+//    g_deviceName = "EPOS4";
+//    g_protocolStackName = "MAXON SERIAL V2";
+//    g_interfaceName = "USB";
+//    g_portName = "USB0";
+//    g_baudrate = 1000000;
+//}
+
+//Error_t Violinist::OpenDevice() {
+//    Error_t lResult = kNoError;
+//    ulErrorCode = 0;
+//    char* pDeviceName = new char[255];
+//    char* pProtocolStackName = new char[255];
+//    char* pInterfaceName = new char[255];
+//    char* pPortName = new char[255];
+//
+//    strcpy(pDeviceName, g_deviceName.c_str());
+//    strcpy(pProtocolStackName, g_protocolStackName.c_str());
+//    strcpy(pInterfaceName, g_interfaceName.c_str());
+//    strcpy(pPortName, g_portName.c_str());
+//
+//    LogInfo("Open device...");
+//
+//    g_pKeyHandle = VCS_OpenDevice(pDeviceName, pProtocolStackName, pInterfaceName, pPortName, &ulErrorCode);
+//
+//    if (g_pKeyHandle != nullptr && ulErrorCode == 0) {
+//        unsigned int lBaudrate = 0;
+//        unsigned int lTimeout = 0;
+//
+//        if (VCS_GetProtocolStackSettings(g_pKeyHandle, &lBaudrate, &lTimeout, &ulErrorCode) != 0) {
+//            if (VCS_SetProtocolStackSettings(g_pKeyHandle, g_baudrate, lTimeout, &ulErrorCode) != 0) {
+//                if (VCS_GetProtocolStackSettings(g_pKeyHandle, &lBaudrate, &lTimeout, &ulErrorCode) != 0) {
+//                    if (g_baudrate != (int)lBaudrate) {
+//                        lResult = kSetValueError;
+//                        LogError("VCS_SetProtocolStackSettings", lResult, ulErrorCode);
+//                        return lResult;
+//                    }
+//                }
+//            }
+//        }
+//    } else {
+//        g_pKeyHandle = nullptr;
+//    }
+//
+//    delete[] pDeviceName;
+//    delete[] pProtocolStackName;
+//    delete[] pInterfaceName;
+//    delete[] pPortName;
+//
+//    return lResult;
+//}
 
 Error_t Violinist::Init(bool shouldHome, bool usePitchCorrection) {
     Error_t lResult;
-    BOOL oIsFault = 0;
+//    BOOL oIsFault = 0;
     m_bShouldHome = shouldHome;
     m_bUsePitchCorrection = usePitchCorrection;
 
-    if ((lResult = OpenDevice()) != kNoError) {
-        LogError("OpenDevice", lResult, ulErrorCode);
+    m_pCommHandler = new CommHandler(CommHandler::I2C);
+    m_pFingerController = new FingerController(m_pCommHandler);
+
+    if (!m_pFingerController->IsInitialized()) {
+        lResult = kNotInitializedError;
+        LogError("FingerInitError", lResult, ulErrorCode);
         return lResult;
-    }
-
-    if (VCS_GetFaultState(g_pKeyHandle, g_usNodeId, &oIsFault, &ulErrorCode) == 0) {
-        LogError("VCS_GetFaultState", lResult, ulErrorCode);
-        lResult = kGetValueError;
-        return lResult;
-    }
-
-    if (oIsFault) {
-        stringstream msg;
-        msg << "clear fault, node = '" << g_usNodeId << "'";
-        LogInfo(msg.str());
-
-        if (VCS_ClearFault(g_pKeyHandle, g_usNodeId, &ulErrorCode) == 0) {
-            LogError("VCS_ClearFault", lResult, ulErrorCode);
-            lResult = kSetValueError;
-            return lResult;
-        }
-    }
-
-    BOOL oIsEnabled = 0;
-
-    if (VCS_GetEnableState(g_pKeyHandle, g_usNodeId, &oIsEnabled, &ulErrorCode) == 0) {
-        LogError("VCS_GetEnableState", lResult, ulErrorCode);
-        lResult = kGetValueError;
-        return lResult;
-    }
-
-    if (!oIsEnabled) {
-        if (VCS_SetEnableState(g_pKeyHandle, g_usNodeId, &ulErrorCode) == 0) {
-            LogError("VCS_SetEnableState", lResult, ulErrorCode);
-            lResult = kSetValueError;
-            return lResult;
-        }
     }
 
     if (shouldHome) {
-        lResult = SetHome();
+        lResult = m_pFingerController->SetHome();
         if (lResult != kNoError) {
             LogError("SetHome", lResult, ulErrorCode);
             return lResult;
         }
-    }
-
-    if ((lResult = CommHandler::Create(m_commHandler)) != kNoError) {
-        LogError("CommHandlerCreationError", lResult, ulErrorCode);
-        return lResult;
-    }
-
-    if ((lResult = m_commHandler->Init(CommHandler::I2C)) != kNoError) {
-        LogError("CommHandlerInitError", lResult, ulErrorCode);
-        return lResult;
     }
 
     if ((lResult = BowController::Create(m_pBowController)) != kNoError) {
@@ -144,18 +124,8 @@ Error_t Violinist::Init(bool shouldHome, bool usePitchCorrection) {
         return lResult;
     }
 
-    if ((lResult = m_pBowController->Init(m_commHandler, &m_iRTPosition)) != kNoError) {
+    if ((lResult = m_pBowController->Init(m_pCommHandler, &m_iRTPosition)) != kNoError) {
         LogError("BowControllerInitError", lResult, ulErrorCode);
-        return lResult;
-    }
-
-    if ((lResult = FingerController::Create(m_pFingerController)) != kNoError) {
-        LogError("FingerCreationError", lResult, ulErrorCode);
-        return lResult;
-    }
-
-    if ((lResult = m_pFingerController->Init(m_commHandler)) != kNoError) {
-        LogError("FingerInitError", lResult, ulErrorCode);
         return lResult;
     }
 
@@ -165,40 +135,28 @@ Error_t Violinist::Init(bool shouldHome, bool usePitchCorrection) {
 
 //    TrackEncoderPosition();
     m_bStopPositionUpdates = false;
+//    encoderTrackThread = std::thread(&Violinist::TrackEncoderPosition, this);
 //    positionTrackThread = std::thread(&Violinist::TrackTargetPosition, this);
 
     return kNoError;
 }
 
-Error_t Violinist::CloseDevice() {
-    Error_t err = kNoError;
-
-    if (m_pCTuner) m_pCTuner->Stop();
-    m_bStopPositionUpdates = true;
-    if (positionTrackThread.joinable())
-        positionTrackThread.join();
-    if (m_pCTuner)
-        if (m_bTunerOn) {
-            m_pCTuner->Reset();
-            CTuner::Destroy(m_pCTuner);
-        }
-    FingerController::Destroy(m_pFingerController);
-    BowController::Destroy(m_pBowController);
-    CommHandler::Destroy(m_commHandler);
-
-    if (VCS_SetDisableState(g_pKeyHandle, g_usNodeId, &ulErrorCode) == 0) {
-        err = kSetValueError;
-        LogError("VCS_SetDisableState", err, ulErrorCode);
-    }
-
-    LogInfo("Close device");
-    if (VCS_CloseDevice(g_pKeyHandle, &ulErrorCode) == 0 && ulErrorCode != 0) {
-        err = kUnknownError;
-        LogError("VCS_CloseDevice", err, ulErrorCode);
-    }
-
-    return err;
-}
+//Error_t Violinist::CloseDevice() {
+//    Error_t err = kNoError;
+//
+//    if (VCS_SetDisableState(g_pKeyHandle, g_usNodeId, &ulErrorCode) == 0) {
+//        err = kSetValueError;
+//        LogError("VCS_SetDisableState", err, ulErrorCode);
+//    }
+//
+//    LogInfo("Close device");
+//    if (VCS_CloseDevice(g_pKeyHandle, &ulErrorCode) == 0 && ulErrorCode != 0) {
+//        err = kUnknownError;
+//        LogError("VCS_CloseDevice", err, ulErrorCode);
+//    }
+//
+//    return err;
+//}
 
 void Violinist::LogInfo(const string &message) {
     cout << message << endl;
@@ -208,69 +166,67 @@ void Violinist::LogError(const string &functionName, Error_t p_lResult, unsigned
     cerr << kName << ": " << functionName << " failed (result=" << CUtil::GetErrorString(p_lResult) << ", errorCode=0x" << std::hex << p_ulErrorCode << ")" << endl;
 }
 
-Error_t Violinist::MoveToPosition(long targetPos) {
-    Error_t lResult = kNoError;
-    unsigned int errorCode = 0;
+//Error_t Violinist::MoveToPosition(long targetPos) {
+//    Error_t lResult = kNoError;
+//    unsigned int errorCode = 0;
+//
+//    if  (m_operationMode == ProfilePosition) {
+//        if (VCS_MoveToPosition(g_pKeyHandle, g_usNodeId, targetPos, 1, 1, &errorCode) == 0) {
+//            lResult = kSetValueError;
+//            LogError("VCS_MoveToPosition", lResult, errorCode);
+//            return lResult;
+//        }
+//        return lResult;
+//    }
+//
+//    if (std::abs(targetPos) < std::abs(MAX_ENCODER_INC) && std::abs(targetPos) >= std::abs(NUT_POSITION)) {
+//        m_pFingerController->UpdatePosition(std::abs(targetPos));
+//        if (VCS_SetPositionMust(g_pKeyHandle, g_usNodeId, targetPos, &ulErrorCode) == 0) {
+//            lResult = kSetValueError;
+//            LogError("VCS_SetPositionMust", lResult, ulErrorCode);
+//        }
+////        std::cout << targetPos << std::endl;
+//    }
+//    return lResult;
+//}
 
-    if  (m_operationMode == ProfilePosition) {
-        if (VCS_MoveToPosition(g_pKeyHandle, g_usNodeId, targetPos, 1, 1, &errorCode) == 0) {
-            lResult = kSetValueError;
-            LogError("VCS_MoveToPosition", lResult, errorCode);
-            return lResult;
-        }
-        return lResult;
-    }
+//double Violinist::FretLength(double fretNumber) {
+//    return (SCALE_LENGTH - (SCALE_LENGTH / pow(2, (fretNumber / 12.0))));
+//}
 
-    if (std::abs(targetPos) < std::abs(MAX_ENCODER_INC) && std::abs(targetPos) >= std::abs(NUT_POSITION)) {
-        m_pFingerController->UpdatePosition(std::abs(targetPos));
-        if (VCS_SetPositionMust(g_pKeyHandle, g_usNodeId, targetPos, &ulErrorCode) == 0) {
-            lResult = kSetValueError;
-            LogError("VCS_SetPositionMust", lResult, ulErrorCode);
-        }
-//        std::cout << targetPos << std::endl;
-    }
-    return lResult;
-}
-
-double Violinist::FretLength(double fretNumber) {
-    return (SCALE_LENGTH - (SCALE_LENGTH / pow(2, (fretNumber / 12.0))));
-}
-
-long Violinist::PositionToPulse(double p) const {
-    return (long)(m_iEncoderDirection * p * 24000.0 / 220.0);
-}
+//long Violinist::PositionToPulse(double p) const {
+//    return (long)(m_iEncoderDirection * p * 24000.0 / 220.0);
+//}
 
 Error_t Violinist::UpdateEncoderPosition() {
-    if (VCS_GetPositionIs(g_pKeyHandle, g_usNodeId, &m_iRTPosition, &ulErrorCode) == 0) {
-        std::cerr << "get value error...\n";
-        return kGetValueError;
-    }
+//    if (VCS_GetPositionIs(g_pKeyHandle, g_usNodeId, &m_iRTPosition, &ulErrorCode) == 0) {
+//        std::cerr << "get value error...\n";
+//        return kGetValueError;
+//    }
 
-//    m_fingerController->UpdatePosition();
+//    m_pFingerController->UpdatePosition(m_iRTPosition);
 //    cout << m_iRTPosition << endl;
     return kNoError;
 }
 
 Error_t Violinist::UpdateTargetPosition() {
-    long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-    return MoveToPosition(targetPosition);
+    long targetPosition = Util::Fret2Position(m_fFretPosition);
+    return m_pFingerController->MoveToPositionl(targetPosition);
 }
 
-long Violinist::ConvertToTargetPosition(double fretPos) {
-    return PositionToPulse(FretLength(fretPos)) + NUT_POSITION;
-}
+//long Violinist::ConvertToTargetPosition(double fretPos) {
+//    return PositionToPulse(FretLength(fretPos)) + NUT_POSITION;
+//}
 
 void Violinist::TrackEncoderPosition() {
     m_bStopPositionUpdates = false;
-    std::thread([this]() {
-        while (!m_bStopPositionUpdates)
-        {
-            auto x = std::chrono::steady_clock::now() + std::chrono::milliseconds(m_iTimeInterval);
-            if (UpdateEncoderPosition() != kNoError)
-                break;
-            std::this_thread::sleep_until(x);
-        }
-    }).detach();
+    while (!m_bStopPositionUpdates)
+    {
+        auto x = std::chrono::steady_clock::now() + std::chrono::milliseconds(m_iTimeInterval);
+        if (UpdateEncoderPosition() != kNoError)
+            break;
+        std::this_thread::sleep_until(x);
+    }
 }
 
 void Violinist::TrackTargetPosition() {
@@ -284,75 +240,75 @@ void Violinist::TrackTargetPosition() {
     }
 }
 
-unsigned int Violinist::GetErrorCode() const {
-    return ulErrorCode;
-}
+//unsigned int Violinist::GetErrorCode() const {
+//    return ulErrorCode;
+//}
 
-int Violinist::GetPosition() {
-    UpdateEncoderPosition();
-    return m_iRTPosition;
-}
+//int Violinist::GetPosition() {
+//    UpdateEncoderPosition();
+//    return m_iRTPosition;
+//}
 
-Error_t Violinist::SetHome() {
-    LogInfo("Setting Home..");
-    Error_t lResult = kNoError;
-    int _lastPosition = 10000;
-    int _currentPosition = -10000;
-    unsigned int errorCode = 0;
-    if (VCS_ActivateProfilePositionMode(g_pKeyHandle, g_usNodeId, &ulErrorCode) == 0) {
-        lResult = kSetValueError;
-        LogError("VCS_ActivateProfilePositionMode", lResult, ulErrorCode);
-        return lResult;
-    }
-    while (true) {
-        if (RawMoveToPosition(-25*m_iEncoderDirection, 1000, 0) != kNoError) {
-            lResult = kSetValueError;
-            LogError("moveToPosition", lResult, errorCode);
-            return lResult;
-        }
-        if (VCS_GetPositionIs(g_pKeyHandle, g_usNodeId, &_currentPosition, &errorCode) == 0) {
-            lResult = kGetValueError;
-            LogError("VCS_GetPositionIs", lResult, errorCode);
-            return lResult;
-        }
-        if (abs(_currentPosition - _lastPosition) < 10)
-            break;
-//        cout << "moving" << endl;
-        _lastPosition = _currentPosition;
-    }
-    if (VCS_DefinePosition(g_pKeyHandle, g_usNodeId, 0, &errorCode) == 0) {
-        lResult = kSetValueError;
-        LogError("VCS_DefinePosition", lResult, errorCode);
-    }
-    return lResult;
-}
+//Error_t Violinist::SetHome() {
+//    LogInfo("Setting Home..");
+//    Error_t lResult = kNoError;
+//    int _lastPosition = 10000;
+//    int _currentPosition = -10000;
+//    unsigned int errorCode = 0;
+//    if (VCS_ActivateProfilePositionMode(g_pKeyHandle, g_usNodeId, &ulErrorCode) == 0) {
+//        lResult = kSetValueError;
+//        LogError("VCS_ActivateProfilePositionMode", lResult, ulErrorCode);
+//        return lResult;
+//    }
+//    while (true) {
+//        if (RawMoveToPosition(-25*m_iEncoderDirection, 1000, 0) != kNoError) {
+//            lResult = kSetValueError;
+//            LogError("moveToPosition", lResult, errorCode);
+//            return lResult;
+//        }
+//        if (VCS_GetPositionIs(g_pKeyHandle, g_usNodeId, &_currentPosition, &errorCode) == 0) {
+//            lResult = kGetValueError;
+//            LogError("VCS_GetPositionIs", lResult, errorCode);
+//            return lResult;
+//        }
+//        if (abs(_currentPosition - _lastPosition) < 10)
+//            break;
+////        cout << "moving" << endl;
+//        _lastPosition = _currentPosition;
+//    }
+//    if (VCS_DefinePosition(g_pKeyHandle, g_usNodeId, 0, &errorCode) == 0) {
+//        lResult = kSetValueError;
+//        LogError("VCS_DefinePosition", lResult, errorCode);
+//    }
+//    return lResult;
+//}
 
-Error_t Violinist::RawMoveToPosition(int _pos, unsigned int _acc, BOOL _absolute) {
-    Error_t lResult = kNoError;
-    unsigned int errorCode = 0;
-
-    stringstream msg;
-    msg << "move to position = " << _pos << ", acc = " << _acc;
-    LogInfo(msg.str());
-
-    if (VCS_SetPositionProfile(g_pKeyHandle, g_usNodeId, 2500, _acc, _acc, &errorCode) == 0) {
-        lResult = kSetValueError;
-        LogError("VCS_SetPositionProfile", lResult, errorCode);
-        return lResult;
-    }
-
-    if (VCS_MoveToPosition(g_pKeyHandle, g_usNodeId, _pos, _absolute, 1, &errorCode) == 0) {
-        lResult = kSetValueError;
-        LogError("VCS_MoveToPosition", lResult, errorCode);
-        return lResult;
-    }
-
-    if (VCS_WaitForTargetReached(g_pKeyHandle, g_usNodeId, 50, &errorCode) == 0) {
-        lResult = kGetValueError;
-        LogError("VCS_WaitForTargetReached", lResult, errorCode);
-    }
-    return lResult;
-}
+//Error_t Violinist::RawMoveToPosition(int _pos, unsigned int _acc, BOOL _absolute) {
+//    Error_t lResult = kNoError;
+//    unsigned int errorCode = 0;
+//
+//    stringstream msg;
+//    msg << "move to position = " << _pos << ", acc = " << _acc;
+//    LogInfo(msg.str());
+//
+//    if (VCS_SetPositionProfile(g_pKeyHandle, g_usNodeId, 2500, _acc, _acc, &errorCode) == 0) {
+//        lResult = kSetValueError;
+//        LogError("VCS_SetPositionProfile", lResult, errorCode);
+//        return lResult;
+//    }
+//
+//    if (VCS_MoveToPosition(g_pKeyHandle, g_usNodeId, _pos, _absolute, 1, &errorCode) == 0) {
+//        lResult = kSetValueError;
+//        LogError("VCS_MoveToPosition", lResult, errorCode);
+//        return lResult;
+//    }
+//
+//    if (VCS_WaitForTargetReached(g_pKeyHandle, g_usNodeId, 50, &errorCode) == 0) {
+//        lResult = kGetValueError;
+//        LogError("VCS_WaitForTargetReached", lResult, errorCode);
+//    }
+//    return lResult;
+//}
 
 Error_t Violinist::Perform(const double *pitches, const size_t& length, short transpose) {
     auto err = kNoError;
@@ -364,7 +320,7 @@ Error_t Violinist::Perform(const double *pitches, const size_t& length, short tr
     for (size_t i=0; i < length; i++) {
         if (pitches[i] >= 0.0) {
             m_pFingerController->On();
-            m_pfFretPosition = pitches[i] + transpose;
+            m_fFretPosition = pitches[i] + transpose;
         } else {
 //            m_fingerController->Off();
         }
@@ -384,14 +340,14 @@ Error_t Violinist::Perform(const double *pitches, const size_t& length, short tr
 void Violinist::PitchCorrect() {
     while (!m_bInterruptPitchCorrection) {
         auto correction = m_pCTuner->GetNoteCorrection();
-        m_pfFretPosition += (PITCH_CORRECTION_FACTOR * correction);
+        m_fFretPosition += (PITCH_CORRECTION_FACTOR * correction);
 //        std::cout << m_pfFretPosition << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
 Error_t Violinist::Perform(Violinist::Key key, Violinist::Mode mode, int interval_ms, float amplitude, short transpose) {
-    auto err = ActivatePositionMode();
+    auto err = m_pFingerController->ActivatePositionMode();
     if (err != kNoError)
         return err;
 
@@ -408,11 +364,10 @@ Error_t Violinist::Perform(Violinist::Key key, Violinist::Mode mode, int interva
         return err;
 
     for (int i=0; i < 8; i++) {
-        m_pfFretPosition = positions[i];
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
+        m_fFretPosition = positions[i];
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
 
-        if (m_pfFretPosition >= .5) {
+        if (m_fFretPosition >= .5) {
             err = m_pFingerController->On();
 //            std::thread([this] {
 //                m_bInterruptPitchCorrection = false;
@@ -424,7 +379,7 @@ Error_t Violinist::Perform(Violinist::Key key, Violinist::Mode mode, int interva
 
         std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
         m_bInterruptPitchCorrection = true;
-//        m_bowController->ChangeDirection();
+        m_pBowController->ChangeDirection();
         m_pBowController->SetAmplitude(amplitude, err);
     }
 
@@ -434,11 +389,10 @@ Error_t Violinist::Perform(Violinist::Key key, Violinist::Mode mode, int interva
     m_pBowController->SetAmplitude(amplitude, err);
 
     for (int i=7; i > -1; i--) {
-        m_pfFretPosition = positions[i];
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
+        m_fFretPosition = positions[i];
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
 
-        if (m_pfFretPosition >= .5) {
+        if (m_fFretPosition >= .5) {
             err = m_pFingerController->On();
 //            std::thread([this] {
 //                m_bInterruptPitchCorrection = false;
@@ -450,19 +404,13 @@ Error_t Violinist::Perform(Violinist::Key key, Violinist::Mode mode, int interva
 
         std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
         m_bInterruptPitchCorrection = true;
-//        m_bowController->ChangeDirection();
+        m_pBowController->ChangeDirection();
         m_pBowController->SetAmplitude(amplitude, err);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
 
-    err = m_pBowController->StopBowing(err);
-    if (err != kNoError)
-        return err;
-
-    m_pFingerController->Rest();
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-//    std::cout << "Here" << std::endl;
+    m_pBowController->StopBowing(err);
     return m_pFingerController->Rest();
 }
 
@@ -470,58 +418,22 @@ Error_t Violinist::GetPositionsForScale(std::vector<float>& positions, Violinist
     switch (mode) {
         case Major:
             positions = {0, 2, 4, 5, 7, 9, 11, 12};
-//            positions[0] = 0;
-//            positions[1] = 2;
-//            positions[2] = 4;
-//            positions[3] = 5;
-//            positions[4] = 7;
-//            positions[5] = 9;
-//            positions[6] = 11;
-//            positions[7] = 12;
             break;
 
         case Minor:
-            positions[0] = 0;
-            positions[1] = 2;
-            positions[2] = 3;
-            positions[3] = 5;
-            positions[4] = 7;
-            positions[5] = 8;
-            positions[6] = 10;
-            positions[7] = 12;
+            positions = {0, 2, 3, 5, 7, 8, 10, 12};
             break;
 
         case Lydian:
-            positions[0] = 0;
-            positions[1] = 2;
-            positions[2] = 4;
-            positions[3] = 6;
-            positions[4] = 7;
-            positions[5] = 9;
-            positions[6] = 11;
-            positions[7] = 12;
+            positions = {0, 2, 4, 6, 7, 9, 11, 12};
             break;
 
         case Dorian:
-            positions[0] = 0;
-            positions[1] = 2;
-            positions[2] = 3;
-            positions[3] = 5;
-            positions[4] = 7;
-            positions[5] = 9;
-            positions[6] = 10;
-            positions[7] = 12;
+            positions = {0, 2, 3, 5, 7, 9, 10, 12};
             break;
 
         case SingleNote:
-            positions[0] = 0;
-            positions[1] = 0;
-            positions[2] = 0;
-            positions[3] = 0;
-            positions[4] = 0;
-            positions[5] = 0;
-            positions[6] = 0;
-            positions[7] = 0;
+            positions = {0, 0, 0, 0, 0, 0, 0, 0};
 
         default:
             return kFunctionIllegalCallError;
@@ -534,7 +446,7 @@ Error_t Violinist::GetPositionsForScale(std::vector<float>& positions, Violinist
 }
 
 Error_t Violinist::Play(float amplitude) {
-    auto err = ActivateProfilePositionMode();
+    auto err = m_pFingerController->ActivateProfilePositionMode();
     if (err != kNoError)
         return err;
 
@@ -554,13 +466,13 @@ Error_t Violinist::Play(float amplitude) {
         return err;
 
     for (int i = 0; i < (int)positionArohanam.size(); i++) {
-        m_pfFretPosition = positionArohanam[i] - 1;
-        if (m_pfFretPosition >= 1)
+        m_fFretPosition = positionArohanam[i] - 1;
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
         stringstream msg;
-        msg << "move to position = " << m_pfFretPosition;
+        msg << "move to position = " << m_fFretPosition;
 //        LogInfo(msg.str());
         msg.str(std::string());
 
@@ -578,13 +490,13 @@ Error_t Violinist::Play(float amplitude) {
     m_pBowController->SetAmplitude(amplitude, kNoError);
 
     for (int i = 0; i < (int)positionAvarohanam.size(); i++) {
-        m_pfFretPosition = positionAvarohanam[i] - 1;
-        if (m_pfFretPosition >= 1)
+        m_fFretPosition = positionAvarohanam[i] - 1;
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
         stringstream msg;
-        msg << "move to position = " << m_pfFretPosition;
+        msg << "move to position = " << m_fFretPosition;
 //        LogInfo(msg.str());
         msg.str(std::string());
 
@@ -647,71 +559,65 @@ Error_t Violinist::Play(float amplitude) {
 //    return m_fingerController->Rest();
 //}
 
-Error_t Violinist::ActivatePositionMode() {
-    stringstream msg;
-    msg << "set position mode, node = " << g_usNodeId;
-    LogInfo(msg.str());
-    msg.str(std::string());
+//Error_t Violinist::ActivatePositionMode() {
+//    stringstream msg;
+//    msg << "set position mode, node = " << g_usNodeId;
+//    LogInfo(msg.str());
+//    msg.str(std::string());
+//
+//    auto err = kNoError;
+//    if (VCS_ActivatePositionMode(g_pKeyHandle, g_usNodeId, &ulErrorCode) == 0) {
+//        err = kSetValueError;
+//        LogError("VCS_ActivatePositionMode", err, ulErrorCode);
+//        return err;
+//    }
+//
+//    if (VCS_SetMaxFollowingError(g_pKeyHandle, g_usNodeId, m_ulMaxFollowErr, &ulErrorCode) == 0) {
+//        err = kGetValueError;
+//        LogError("VCS_GetMaxFollowingError", err, ulErrorCode);
+//        return err;
+//    }
+//
+//    unsigned int get_maxErr = 0;
+//
+//    if (VCS_GetMaxFollowingError(g_pKeyHandle, g_usNodeId, &get_maxErr, &ulErrorCode) == 0) {
+//        err = kGetValueError;
+//        LogError("VCS_GetMaxFollowingError", err, ulErrorCode);
+//        return err;
+//    }
+//
+//    if (m_ulMaxFollowErr != get_maxErr) {
+//        err = kSetValueError;
+//        LogError("MaxFollowingError", err, ulErrorCode);
+//        return err;
+//    }
+//
+//    m_operationMode = Position;
+//    return kNoError;
+//}
 
-    auto err = kNoError;
-    if (VCS_ActivatePositionMode(g_pKeyHandle, g_usNodeId, &ulErrorCode) == 0) {
-        err = kSetValueError;
-        LogError("VCS_ActivatePositionMode", err, ulErrorCode);
-        return err;
-    }
-
-    if (VCS_SetMaxFollowingError(g_pKeyHandle, g_usNodeId, m_ulMaxFollowErr, &ulErrorCode) == 0) {
-        err = kGetValueError;
-        LogError("VCS_GetMaxFollowingError", err, ulErrorCode);
-        return err;
-    }
-
-    unsigned int get_maxErr = 0;
-
-    if (VCS_GetMaxFollowingError(g_pKeyHandle, g_usNodeId, &get_maxErr, &ulErrorCode) == 0) {
-        err = kGetValueError;
-        LogError("VCS_GetMaxFollowingError", err, ulErrorCode);
-        return err;
-    }
-
-    if (m_ulMaxFollowErr != get_maxErr) {
-        err = kSetValueError;
-        LogError("MaxFollowingError", err, ulErrorCode);
-        return err;
-    }
-
-    m_operationMode = Position;
-    return kNoError;
-}
-
-Error_t Violinist::ActivateProfilePositionMode(unsigned int uiVelocity, unsigned int uiAcc) {
-    auto lResult = kNoError;
-    unsigned int lErrorCode = 0;
-    stringstream msg;
-    msg << "set profile position mode, node = " << g_usNodeId;
-    LogInfo(msg.str());
-    msg.str(std::string());
-
-    if (VCS_ActivateProfilePositionMode(g_pKeyHandle, g_usNodeId, &lErrorCode) == 0) {
-        lResult = kSetValueError;
-        LogError("VCS_ActivateProfilePositionMode", lResult, lErrorCode);
-        return lResult;
-    }
-
-    if (VCS_SetPositionProfile(g_pKeyHandle, g_usNodeId, uiVelocity, uiAcc, uiAcc, &lErrorCode) == 0) {
-        lResult = kSetValueError;
-        LogError("VCS_SetPositionProfile", lResult, lErrorCode);
-        return lResult;
-    }
-
-    m_operationMode = ProfilePosition;
-    return kNoError;
-}
+//Error_t Violinist::ActivateProfilePositionMode(unsigned int uiVelocity, unsigned int uiAcc) {
+//    auto lResult = kNoError;
+//    unsigned int lErrorCode = 0;
+//    stringstream msg;
+//    msg << "set profile position mode, node = " << g_usNodeId;
+//    LogInfo(msg.str());
+//    msg.str(std::string());
+//
+//    if (VCS_ActivateProfilePositionMode(g_pKeyHandle, g_usNodeId, &lErrorCode) == 0) {
+//        lResult = kSetValueError;
+//        LogError("VCS_ActivateProfilePositionMode", lResult, lErrorCode);
+//        return lResult;
+//    }
+//
+//    m_operationMode = ProfilePosition;
+//    return kNoError;
+//}
 
 void Violinist::SetupTuner() {
     CTuner::Create(m_pCTuner);
 
-    if (m_pCTuner->Init(&m_pfFretPosition) != kNoError) {
+    if (m_pCTuner->Init(&m_fFretPosition) != kNoError) {
         LogInfo("Tuner init failed. Tuner will be switched off...");
         m_bTunerOn = false;
         CTuner::Destroy(m_pCTuner);
@@ -733,7 +639,7 @@ Error_t Violinist::Perform(Violinist::Gamaka gamaka, int exampleNumber, int inte
 {
     switch (gamaka) {
         case Spurita:
-            return PerformSpurita(interval_ms, amplitude);
+            return PerformSpurita(exampleNumber, interval_ms, amplitude);
 
         case Jaaru:
             return PerformJaaru(interval_ms, amplitude);
@@ -761,16 +667,28 @@ Error_t Violinist::Perform(Violinist::Gamaka gamaka, int exampleNumber, int inte
     }
 }
 
-Error_t Violinist::PerformSpurita(int interval_ms, float amplitude)
+Error_t Violinist::PerformSpurita(int exampleNumber, int interval_ms, float amplitude)
 {
-    auto err = ActivateProfilePositionMode(5000, 18000);
+    auto err = m_pFingerController->SetPositionProfile(5000, 20000);
     if (err != kNoError)
         return err;
 
-    vector<float> position  = {2, 1, 2, 4, 3, 4, 6, 5, 6, 7, 6, 7, 9};  // 13
-    vector<float> time      = {1, 0.1, 0.9, 1, 0.1, 0.9, 1, 0.1, 0.9, 1, 0.1, 0.9, 2};  // 13
-    vector<uint8_t> bowChange  = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // 13 (1st dummy = 0)
-//    vector<bool> bowChange  = {0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1}; // 13 (1st dummy = 0)
+    vector<float> position;
+
+    switch(exampleNumber) {
+        case 0:
+            position = {2, 1.5, 2, 4, 3.5, 4, 6, 5.5, 6, 8, 7.5, 8, 9};
+            break;
+        case 1:
+            position = {2, 1.5, 2, 7, 6.5, 7, 6, 5.5, 6, 4, 3.5, 4, 2};
+            break;
+        default:
+            return kUnknownError;
+    }
+
+    vector<float> time          = {1, 0.05, 0.95, 1, 0.05, 0.95, 1, 0.05, 0.95, 1, 0.05, 0.95, 2};  // 13
+//    vector<uint8_t> bowChange  = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // 13 (1st dummy = 0)
+    vector<uint8_t> bowChange   = {0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1}; // 13 (1st dummy = 0)
 
     err = m_pFingerController->Rest();
     err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
@@ -783,11 +701,13 @@ Error_t Violinist::PerformSpurita(int interval_ms, float amplitude)
             m_pBowController->SetAmplitude(amplitude, kNoError);
         }
 
-        m_pfFretPosition = position[i] - 1;
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
+        m_fFretPosition = position[i] - 1;
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
+        if (err != kNoError) {
+            return m_pFingerController->Rest();;
+        }
 
-        if (m_pfFretPosition >= 1)
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
@@ -800,27 +720,15 @@ Error_t Violinist::PerformSpurita(int interval_ms, float amplitude)
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    err = m_pBowController->StopBowing(err);
-    if (err != kNoError)
-        return err;
-
+    m_pBowController->StopBowing(err);
     return m_pFingerController->Rest();
 }
 
 Error_t Violinist::PerformJaaru(int interval_ms, float amplitude)
 {
-    auto err = ActivateProfilePositionMode();
+    auto err = m_pFingerController->ActivateProfilePositionMode();
     if (err != kNoError)
         return err;
-
-//    unsigned int lErrorCode;
-//    Error_t lResult;
-//
-//    if (VCS_SetPositionProfile(g_pKeyHandle, g_usNodeId, 2500, 4000, 4000, &lErrorCode) == 0) {
-//        lResult = kSetValueError;
-//        LogError("VCS_SetPositionProfile", lResult, lErrorCode);
-//        return lResult;
-//    }
 
     vector<float> position  = {6, 4, 6, 6, 9, 9, 14, 11, 9, 14, 14};  // 11
     vector<float> time      = {1, 0.1, 0.9, 0.1, 1.9, 2, 0.1, 0.9, 1, 2, 2};  // 11
@@ -837,11 +745,13 @@ Error_t Violinist::PerformJaaru(int interval_ms, float amplitude)
             m_pBowController->SetAmplitude(amplitude, kNoError);
         }
 
-        m_pfFretPosition = position[i] - 1;
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
+        m_fFretPosition = position[i] - 1;
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
+        if (err != kNoError) {
+            return m_pFingerController->Rest();;
+        }
 
-        if (m_pfFretPosition >= 1)
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
@@ -854,16 +764,13 @@ Error_t Violinist::PerformJaaru(int interval_ms, float amplitude)
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    err = m_pBowController->StopBowing(err);
-    if (err != kNoError)
-        return err;
-
+    m_pBowController->StopBowing(err);
     return m_pFingerController->Rest();
 }
 
 Error_t Violinist::PerformNokku(int interval_ms, float amplitude)
 {
-    auto err = ActivateProfilePositionMode(2500, 12000);
+    auto err = m_pFingerController->SetPositionProfile(2500, 12000);
     if (err != kNoError)
         return err;
 
@@ -882,14 +789,13 @@ Error_t Violinist::PerformNokku(int interval_ms, float amplitude)
             m_pBowController->SetAmplitude(amplitude, kNoError);
         }
 
-        m_pfFretPosition = position[i] - 1;
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
+        m_fFretPosition = position[i] - 1;
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
 
         if (err != kNoError)
             return m_pFingerController->Rest();
 
-        if (m_pfFretPosition >= 1)
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
@@ -903,15 +809,12 @@ Error_t Violinist::PerformNokku(int interval_ms, float amplitude)
     }
 
     err = m_pBowController->StopBowing(err);
-    if (err != kNoError)
-        return err;
-
     return m_pFingerController->Rest();
 }
 
 Error_t Violinist::PerformOdukkal(int interval_ms, float amplitude)
 {
-    auto err = ActivateProfilePositionMode(2500, 10000);
+    auto err = m_pFingerController->SetPositionProfile(2500, 10000);
     if (err != kNoError)
         return err;
 
@@ -930,14 +833,12 @@ Error_t Violinist::PerformOdukkal(int interval_ms, float amplitude)
             m_pBowController->SetAmplitude(amplitude, kNoError);
         }
 
-        m_pfFretPosition = position[i] - 1;
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
-
+        m_fFretPosition = position[i] - 1;
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
         if (err != kNoError)
             return m_pFingerController->Rest();
 
-        if (m_pfFretPosition >= 1)
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
@@ -950,16 +851,13 @@ Error_t Violinist::PerformOdukkal(int interval_ms, float amplitude)
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    err = m_pBowController->StopBowing(err);
-    if (err != kNoError)
-        return err;
-
+    m_pBowController->StopBowing(err);
     return m_pFingerController->Rest();
 }
 
 Error_t Violinist::PerformOrikkai(int interval_ms, float amplitude)
 {
-    auto err = ActivateProfilePositionMode(2500, 10000);
+    auto err = m_pFingerController->SetPositionProfile(2500, 10000);
     if (err != kNoError)
         return err;
 
@@ -978,14 +876,12 @@ Error_t Violinist::PerformOrikkai(int interval_ms, float amplitude)
             m_pBowController->SetAmplitude(amplitude, kNoError);
         }
 
-        m_pfFretPosition = position[i] - 1;
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
-
+        m_fFretPosition = position[i] - 1;
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
         if (err != kNoError)
             return m_pFingerController->Rest();
 
-        if (m_pfFretPosition >= 1)
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
@@ -998,16 +894,13 @@ Error_t Violinist::PerformOrikkai(int interval_ms, float amplitude)
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    err = m_pBowController->StopBowing(err);
-    if (err != kNoError)
-        return err;
-
+    m_pBowController->StopBowing(err);
     return m_pFingerController->Rest();
 }
 
 Error_t Violinist::PerformKhandimpu(int interval_ms, float amplitude)
 {
-    auto err = ActivateProfilePositionMode();
+    auto err = m_pFingerController->ActivateProfilePositionMode();
     if (err != kNoError)
         return err;
 
@@ -1026,14 +919,12 @@ Error_t Violinist::PerformKhandimpu(int interval_ms, float amplitude)
             m_pBowController->SetAmplitude(amplitude, kNoError);
         }
 
-        m_pfFretPosition = position[i] - 1;
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
-
+        m_fFretPosition = position[i] - 1;
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
         if (err != kNoError)
             return m_pFingerController->Rest();
 
-        if (m_pfFretPosition >= 1)
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
@@ -1046,10 +937,7 @@ Error_t Violinist::PerformKhandimpu(int interval_ms, float amplitude)
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    err = m_pBowController->StopBowing(err);
-    if (err != kNoError)
-        return err;
-
+    m_pBowController->StopBowing(err);
     return m_pFingerController->Rest();
 }
 
@@ -1060,7 +948,7 @@ Error_t Violinist::PerformVali(int interval_ms, float amplitude)
 
 Error_t Violinist::PerformKampita(int exampleNumber, int interval_ms, float amplitude)
 {
-    auto err = ActivateProfilePositionMode(2500, 15000);
+    auto err = m_pFingerController->SetPositionProfile(2500, 15000);
     if (err != kNoError)
         return err;
 
@@ -1108,14 +996,12 @@ Error_t Violinist::PerformKampita(int exampleNumber, int interval_ms, float ampl
             m_pBowController->SetAmplitude(amplitude, kNoError);
         }
 
-        m_pfFretPosition = position[i] - 1;
-        long targetPosition = ConvertToTargetPosition(m_pfFretPosition);
-        err = MoveToPosition(targetPosition);
-
+        m_fFretPosition = position[i] - 1;
+        err = m_pFingerController->MoveToPositionf(m_fFretPosition);
         if (err != kNoError)
             return m_pFingerController->Rest();
 
-        if (m_pfFretPosition >= 1)
+        if (m_fFretPosition >= 1)
             err = m_pFingerController->On();
         else
             err = m_pFingerController->Off();
@@ -1128,10 +1014,7 @@ Error_t Violinist::PerformKampita(int exampleNumber, int interval_ms, float ampl
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    err = m_pBowController->StopBowing(err);
-    if (err != kNoError)
-        return err;
-
+    m_pBowController->StopBowing(err);
     return m_pFingerController->Rest();
 }
 

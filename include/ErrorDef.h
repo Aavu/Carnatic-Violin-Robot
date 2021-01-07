@@ -8,6 +8,7 @@ enum Error_t
     kFileOpenError,
     kFileAccessError,
     kFileWriteError,
+    kFileCloseError,
 
     kFunctionInvalidArgsError,
     kFunctionExecOrderError,
