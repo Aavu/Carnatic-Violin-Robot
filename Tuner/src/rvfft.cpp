@@ -433,11 +433,12 @@ void irealfft_packed(float *data, long size){
 
 void realfft_bruun(float *data, long size){
 
-    float *end, *l0, *l1, *l2=0, *l3=0;
+    // float *end;
+    float *l0, *l1, *l2=0, *l3=0;
     long dl, dl2, dl_o, dl2_o, i, j, k, kk;
     float d0,d1,d2,d3,c,c2,p4;
 
-    end=data+size;
+    // end=data+size;
     //first filterings, when there're only two taps
     size>>=1;
     dl=size;

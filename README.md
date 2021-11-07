@@ -1,4 +1,4 @@
-# Violinist
+# Hathaani
 Make sure to install deps
 ### alsa
 sudo apt-get install libasound2-dev

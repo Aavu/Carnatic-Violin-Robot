@@ -12,8 +12,8 @@ const float CFft::m_Pi  = static_cast<float>(M_PI);
 const float CFft::m_Pi2 = static_cast<float>(M_PI_2);
 
 CFft::CFft() :
-    m_pfProcessBuff(0),
-    m_pfWindowBuff(0),
+    m_pfProcessBuff(nullptr),
+    m_pfWindowBuff(nullptr),
     m_iDataLength(0),
     m_iFftLength(0),
     m_ePrePostWindowOpt(kNoWindow),
@@ -38,14 +38,14 @@ Error_t CFft::destroyInstance( CFft*& pCFft )
         return kNoError;
 
     delete pCFft;
-    pCFft   = 0;
+    pCFft   = nullptr;
 
     return kNoError;
 }
 
 Error_t CFft::initInstance( int iBlockLength, int iZeroPadFactor, WindowFunction_t eWindow /*= kWindowHann*/, Windowing_t eWindowing /*= kPreWindow*/ )
 {
-    Error_t  rErr = kNoError;
+    Error_t  rErr;
 
     // sanity check
     if (!CUtil::isPowOf2(iBlockLength) || iZeroPadFactor <= 0 || !CUtil::isPowOf2(iBlockLength*iZeroPadFactor))
@@ -261,8 +261,8 @@ Error_t CFft::freeMemory()
     delete [] m_pfProcessBuff;
     delete [] m_pfWindowBuff;
 
-    m_pfProcessBuff = 0;
-    m_pfWindowBuff  = 0;
+    m_pfProcessBuff = nullptr;
+    m_pfWindowBuff  = nullptr;
 
     return kNoError;
 }
@@ -298,12 +298,14 @@ Error_t CFft::computeWindow( WindowFunction_t eWindow )
             }
             break;
         }
+    default:
+        break;
     }
 
     return kNoError;
 }
 
-int CFft::getLength( Length_t eLengthIdx )
+int CFft::getLength( Length_t eLengthIdx ) const
 {
     switch (eLengthIdx)
     {
@@ -314,6 +316,8 @@ int CFft::getLength( Length_t eLengthIdx )
     case kLengthMagnitude:
     case kLengthPhase:
         return m_iFftLength/2+1;
+    default:
+        break;
     }
     return 0;
 }
