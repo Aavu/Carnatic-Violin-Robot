@@ -14,6 +14,7 @@
 #include <thread>
 #include <sstream>
 
+#include "Dynamixel.h"
 #include "EposController.h"
 #include "MyDefinitions.h"
 #include "FingerController.h"

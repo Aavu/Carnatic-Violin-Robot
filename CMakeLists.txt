@@ -18,6 +18,6 @@ include_directories(
 )
 
 add_subdirectory(${LOGGER_LIB})
-
+add_subdirectory(Dynamixel)
 add_subdirectory(${PROJECT_NAME})
 add_subdirectory(Tuner)

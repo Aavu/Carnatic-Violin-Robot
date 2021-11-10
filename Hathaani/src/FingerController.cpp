@@ -88,7 +88,7 @@ Error_t FingerController::SetCurrentState(FingerController::State c_state, bool 
     return kNoError;
 }
 
-Error_t FingerController::MoveToPositionf(float fFretPosition)
+Error_t FingerController::MoveToPosition(float fFretPosition)
 {
     return MoveToPositionl(Util::Fret2Position(fFretPosition));
 }

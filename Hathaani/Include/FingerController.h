@@ -30,7 +30,7 @@ public:
 
 //    Error_t Init();
 
-    bool IsInitialized() const;
+    [[nodiscard]] bool IsInitialized() const;
     Error_t Reset();
 
     Error_t Move(uint8_t value);
@@ -45,7 +45,7 @@ public:
 
 //    Error_t SetPositionProfile(unsigned long ulVelocity = 2500, unsigned long ulAcc = 10000);
 //    Error_t MoveToPosition(long targetPos);
-    Error_t MoveToPositionf(float fFretPosition);
+    Error_t MoveToPosition(float fFretPosition);
 
 private:
     enum State {
