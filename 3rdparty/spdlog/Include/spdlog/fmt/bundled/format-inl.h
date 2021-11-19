@@ -1205,7 +1205,7 @@ int snprintf_float(T value, int precision, float_specs specs,
       // Remove trailing zeros.
       auto fraction_end = exp_pos - 1;
       while (*fraction_end == '0') --fraction_end;
-      // Move the fractional part left to get rid of the decimal point.
+      // move the fractional part left to get rid of the decimal point.
       fraction_size = static_cast<int>(fraction_end - begin - 1);
       std::memmove(begin + 1, begin + 2, to_unsigned(fraction_size));
     }

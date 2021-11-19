@@ -22,20 +22,25 @@
 
 #define ENABLE_BOWING
 
-#define FINGER_EPOS4_USB "USB1"
-#define BOW_EPOS4_USB   "USB0"
+#define FINGER_EPOS4_USB    "USB0"
+#define BOW_EPOS4_USB       "USB1"
+#define DXL_DEVICE_NAME     "/dev/ttyUSB0"
+
+#define DXL_BAUDRATE        57600
 
 static const float SCALE_LENGTH             = 330;  //mm
-static const int MAX_ENCODER_INC            = 23000;
-static const int NUT_POSITION               = 350;
+static const int MAX_ENCODER_INC            = 20000;
+static const int NUT_POSITION               = 3000;
 static const float P2P_MULTIPLIER           = 10300.f/100.f;    // Pulses per mm
 static const unsigned int MAX_FOLLOW_ERROR  = 20000;
 
 static const float PITCH_CORRECTION_FACTOR  = 0; //0.001;
 
 // Finger
-#define FINGER_OFF 0
-#define FINGER_ON 1
+#define FINGER_OFF 40
+#define FINGER_ON 18
+
+#define MAX_CURRENT 500
 
 #define FINGER_OFF_MAX 135
 #define FINGER_ON_MAX 95
@@ -44,9 +49,9 @@ static const float PITCH_CORRECTION_FACTOR  = 0; //0.001;
 
 // Bow
 #define BOW_PITCH_TRANSLATION 127
-#define MIN_PITCH 75
-#define MAX_PITCH 130
-#define ROSIN_PRESSURE 30
+#define MIN_PITCH 196    // 202.15
+#define MAX_PITCH 170       // 158.2
+#define ROSIN_PRESSURE 0
 #define ROSIN_SPEED 150
 #define MIN_VELOCITY 70
 #define MAX_VELOCITY 150

@@ -6,6 +6,7 @@
 
 BowController::BowController() : m_bInitialized(false),
                                  m_commHandler(nullptr),
+                                 m_pPortHandler(nullptr),
                                  m_bowingState(Stopped),
                                  m_iBowSpeed(0), m_fBowPressure(0),
                                  m_currentDirection(Bow::Down), m_currentBowPitch(MIN_PITCH),
@@ -15,6 +16,9 @@ BowController::BowController() : m_bInitialized(false),
 
 BowController::~BowController()
 {
+    delete m_pPitchDxl;
+    delete m_pYawDxl;
+    delete m_pRollDxl;
 }
 
 Error_t BowController::Create(BowController *&pCInstance) {
@@ -29,9 +33,10 @@ Error_t BowController::Create(BowController *&pCInstance) {
 Error_t BowController::Destroy(BowController *&pCInstance) {
 #ifdef ENABLE_BOWING
     auto err = kNoError;
-    err = pCInstance->StopBowing(err);
+    err = pCInstance->stopBowing(err);
     if (err != kNoError) {
-        CUtil::PrintError(__PRETTY_FUNCTION__, err);
+        LOG_ERROR("Stop bowing failed");
+//        CUtil::PrintError(__PRETTY_FUNCTION__, err);
         return err;
     }
     delete pCInstance;
@@ -41,10 +46,52 @@ Error_t BowController::Destroy(BowController *&pCInstance) {
 #endif
 }
 
-Error_t BowController::Init(CommHandler* commHandler, int* RTPosition) {
+Error_t BowController::Init(CommHandler* commHandler, PortHandler& portHandler, int* RTPosition) {
     auto err = Reset();
     if (err != kNoError)
         return err;
+
+    m_pPortHandler = &portHandler;
+    auto* packetHandler = PortHandler::getPacketHandler();
+
+    m_pPitchDxl = new Dynamixel(2, *m_pPortHandler, *packetHandler);
+    m_pPitchDxl->operatingMode(OperatingMode::PositionControl);
+    if (m_pPitchDxl->torque() != 0) {
+        LOG_ERROR("Cannot set torque on pitch dxl");
+        return kSetValueError;
+    }
+
+    if (m_pPitchDxl->moveToPosition(180.f) != SUCCESS) {
+        LOG_ERROR("Cannot set torque on pitch dxl");
+        return kSetValueError;
+    }
+
+    m_pRollDxl = new Dynamixel(4, *m_pPortHandler, *packetHandler);
+    m_pRollDxl->operatingMode(OperatingMode::PositionControl);
+    if (m_pRollDxl->torque() != 0) {
+        LOG_ERROR("Cannot set torque on Roll dxl");
+        return kSetValueError;
+    }
+
+    if (m_pRollDxl->moveToPosition(180.f) != SUCCESS) {
+        LOG_ERROR("Cannot set torque on pitch dxl");
+        return kSetValueError;
+    }
+
+    m_pYawDxl = new Dynamixel(3, *m_pPortHandler, *packetHandler);
+    m_pYawDxl->operatingMode(OperatingMode::PositionControl);
+    if (m_pYawDxl->torque() != 0) {
+        LOG_ERROR("Cannot set torque on Yaw dxl");
+        return kSetValueError;
+    }
+
+    if (m_pYawDxl->moveToPosition(140.f) != SUCCESS) {
+        LOG_ERROR("Cannot set torque on pitch dxl");
+        return kSetValueError;
+    }
+
+
+
 #ifdef ENABLE_BOWING
     m_piRTPosition = RTPosition;
     m_commHandler = commHandler;
@@ -53,7 +100,7 @@ Error_t BowController::Init(CommHandler* commHandler, int* RTPosition) {
     else
         return kNotInitializedError;
 
-    err = m_wheelController.Init(EposController::ProfileVelocity);
+    err = m_wheelController.init(EposController::ProfileVelocity);
     if (err != kNoError)
         return err;
 
@@ -63,7 +110,7 @@ Error_t BowController::Init(CommHandler* commHandler, int* RTPosition) {
 #endif
 }
 
-Error_t BowController::SetSpeed(Bow::Direction direction, uint8_t bowSpeed, Error_t error) {
+Error_t BowController::setSpeed(Bow::Direction direction, long bowSpeed, Error_t error) {
     if (error != kNoError)
         return error;
 #ifdef ENABLE_BOWING
@@ -71,11 +118,7 @@ Error_t BowController::SetSpeed(Bow::Direction direction, uint8_t bowSpeed, Erro
     m_currentDirection = direction;
     if (direction == Bow::Up) {
         return m_wheelController.MoveWithVelocity(m_iBowSpeed);
-//        err = Send(Register::kRoller, 128 + m_iBowSpeed, err);
     }
-//    else {
-//        err = Send(Register::kRoller, 128 - m_iBowSpeed, err);
-//    }
     return m_wheelController.MoveWithVelocity(-m_iBowSpeed);
 #else
     return kNoError;
@@ -83,22 +126,17 @@ Error_t BowController::SetSpeed(Bow::Direction direction, uint8_t bowSpeed, Erro
 }
 
 /* Pressure of 0 means not touching the string. Pressure of 1.0 means screaching sound */
-Error_t BowController::SetPressure(float bowPressure, Error_t error) {
-    if (error != kNoError)
-        return error;
+Error_t BowController::setPressure(float fAmplitude) {
 #ifdef ENABLE_BOWING
-    m_fBowPressure = bowPressure;
-    auto iPressure = TransformPressure(m_fBowPressure);
-
-    auto err = kNoError;
-    return Send(Register::kPitch, iPressure, err);
-#else
-    return kNoError;
+    m_fBowPressure = fAmplitude;
+    auto fAngle = transformPressure(m_fBowPressure);
+//    std::cout << fAmplitude << " " << fAngle << std::endl;
+    if (m_pPitchDxl->moveToPosition(fAngle) != SUCCESS) {
+        LOG_ERROR("Pitch dxl Move to position error");
+        return kSetValueError;
+    }
 #endif
-}
-
-Error_t BowController::SetPressure(uint8_t bowPressure, Error_t error) {
-    return Send(Register::kPitch, bowPressure, error);
+    return kNoError;
 }
 
 Error_t BowController::StartBowing(float amplitude, Bow::Direction direction, Error_t error) {
@@ -106,7 +144,7 @@ Error_t BowController::StartBowing(float amplitude, Bow::Direction direction, Er
         return error;
 #ifdef ENABLE_BOWING
     m_currentDirection = direction;
-    auto err = SetAmplitude(amplitude, kNoError);
+    auto err = setAmplitude(amplitude, kNoError);
 
     if (err != kNoError) {
         std::cerr << "Error setting amplitude" << std::endl;
@@ -121,12 +159,12 @@ Error_t BowController::StartBowing(float amplitude, Bow::Direction direction, Er
 
 }
 
-Error_t BowController::StopBowing(Error_t error) {
+Error_t BowController::stopBowing(Error_t error) {
     if (error != kNoError)
         return error;
 #ifdef ENABLE_BOWING
     auto err = kNoError;
-    BowOnString(false, err);
+    bowOnString(false, err);
     err = m_wheelController.Halt();
     if (err != kNoError)
         return err;
@@ -137,7 +175,7 @@ Error_t BowController::StopBowing(Error_t error) {
 #endif
 }
 
-Error_t BowController::BowOnString(bool on, Error_t error) {
+Error_t BowController::bowOnString(bool on, Error_t error) {
     if (error != kNoError)
         return error;
 
@@ -147,9 +185,9 @@ Error_t BowController::BowOnString(bool on, Error_t error) {
 
     auto err = kNoError;
     if (on) {
-        err = SetPressure(1.f, err);
+        err = setPressure(1.f);
     } else {
-        err = SetPressure(0.f, err);
+        err = setPressure(0.f);
     }
 
     return err;
@@ -168,29 +206,30 @@ Error_t BowController::Reset() {
     return kNoError;
 }
 
-Error_t BowController::Send(Register::Bow reg, const uint8_t &data, Error_t error) {
-    if (error != kNoError)
-        return error;
-
-    return m_commHandler->Send(reg, data);
-}
+//Error_t BowController::Send(Register::Bow reg, const uint8_t &data, Error_t error) {
+//    if (error != kNoError)
+//        return error;
+//
+//    return m_commHandler->Send(reg, data);
+//}
 
 template <typename T>
 static T clamp(T value, T min, T max) {
     return std::max(std::min(value, max), min);
 }
 
-Error_t BowController::SetAmplitude(float amplitude, Error_t error) {
+Error_t BowController::setAmplitude(float amplitude, Error_t error) {
     if (error != kNoError)
         return error;
 #ifdef ENABLE_BOWING
     amplitude = clamp(amplitude, 0.4f, 1.0f);
     m_currentAmplitude = amplitude;
 
-    uint8_t velocity, pressure;
-    auto err = ComputeVelocityAndPressureFor(m_currentAmplitude, &velocity, &pressure, error);
-    err = SetPressure(pressure, err);
-    err = SetSpeed(m_currentDirection, velocity, err);
+    long velocity;
+    float pressure;
+    auto err = ComputeVelocityAndPressureFor(m_currentAmplitude, &velocity, &pressure);
+    err = setPressure(m_currentAmplitude);
+    err = setSpeed(m_currentDirection, velocity, err);
 
     return err;
 #else
@@ -199,26 +238,26 @@ Error_t BowController::SetAmplitude(float amplitude, Error_t error) {
 }
 
 /* Pressure of 0 means not touching the string. Pressure of 1.0 means screaching sound */
-uint8_t BowController::TransformPressure(float pressure) {
+float BowController::transformPressure(float pressure) {
     float multiplier = .75;
     float range = MAX_PITCH * 1.0f / MIN_PITCH;
     return MIN_PITCH * (1.0 + ((range - 1) * pressure * multiplier));
 }
 
 /* Velocity of 0 means not playing. 1.0 means full rpm */
-uint8_t BowController::TransformVelocity(float velocity) {
+long BowController::transformVelocity(float velocity) {
     float multiplier = 1;
     float range = MAX_VELOCITY * 1.0f / MIN_VELOCITY;
     return MIN_VELOCITY * (1.0 + ((range - 1) * velocity * multiplier));
 }
 
-Error_t BowController::ComputeVelocityAndPressureFor(float amplitude, uint8_t* velocity, uint8_t* pressure, Error_t error) {
-    *pressure = TransformPressure(amplitude);
-    *velocity = TransformVelocity(amplitude);
-    return error;
+Error_t BowController::ComputeVelocityAndPressureFor(float amplitude, long* velocity, float* pressure) {
+    *pressure = transformPressure(amplitude);
+    *velocity = transformVelocity(amplitude);
+    return kNoError;
 }
 
-Bow::Direction BowController::ChangeDirection() {
+Bow::Direction BowController::changeDirection() {
 #ifdef ENABLE_BOWING
     m_currentDirection = static_cast<Bow::Direction>(!m_currentDirection);
     return m_currentDirection;
@@ -227,20 +266,20 @@ Bow::Direction BowController::ChangeDirection() {
 #endif
 }
 
-Error_t BowController::SetDirection(Bow::Direction direction) {
+Error_t BowController::setDirection(Bow::Direction direction) {
 #ifdef ENABLE_BOWING
     m_currentDirection = direction;
     if (m_bowingState == Playing)
-        return SetAmplitude(m_currentAmplitude);
+        return setAmplitude(m_currentAmplitude);
     return kNoError;
 #else
     return kNoError;
 #endif
 }
 
-Error_t BowController::ResumeBowing(Error_t error) {
+Error_t BowController::resumeBowing(Error_t error) {
 #ifdef ENABLE_BOWING
-    error = SetSpeed(m_currentDirection, m_currentAmplitude, error);
+    error = setSpeed(m_currentDirection, m_currentAmplitude, error);
     if (error != kNoError)
         m_bowingState = Playing;
     return error;
@@ -251,7 +290,7 @@ Error_t BowController::ResumeBowing(Error_t error) {
 
 Error_t BowController::PauseBowing(Error_t error) {
 #ifdef ENABLE_BOWING
-    error = SetSpeed(m_currentDirection, 0, error);
+    error = setSpeed(m_currentDirection, 0, error);
     if (error != kNoError)
         m_bowingState = Paused;
     return error;
@@ -263,7 +302,7 @@ Error_t BowController::PauseBowing(Error_t error) {
 Error_t BowController::RosinMode()
 {
 #ifdef ENABLE_BOWING
-    auto err = SetPressure((uint8_t)ROSIN_PRESSURE);
+    auto err = setPressure((uint8_t)ROSIN_PRESSURE);
     if (err != kNoError)
         return err;
 
@@ -274,4 +313,28 @@ Error_t BowController::RosinMode()
 #else
     return kNoError;
 #endif
+}
+
+Error_t BowController::setString(BowController::String str) {
+    float angle = 180;
+    switch (str) {
+        case E:
+            angle = 195;
+            break;
+        case A:
+            angle = 185;
+            break;
+        case D:
+            angle = 178;
+            break;
+        case G:
+            angle = 165;
+            break;
+    }
+
+    if (m_pRollDxl->moveToPosition(angle) != SUCCESS) {
+        LOG_ERROR("Cannot set torque on pitch dxl");
+        return kSetValueError;
+    }
+    return kNoError;
 }

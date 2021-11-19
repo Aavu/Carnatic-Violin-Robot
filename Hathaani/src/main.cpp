@@ -36,8 +36,8 @@ int main(int argc, char **argv) {
 
     Hathaani hathaani;
 
-    if ((lResult = hathaani.Init()) != kNoError) {
-        Hathaani::LogError("Main Init", lResult, 0);
+    if ((lResult = hathaani.init()) != kNoError) {
+        Hathaani::LogError("Main init", lResult, 0);
         return lResult;
     }
 #ifdef SET_HOME
@@ -61,17 +61,25 @@ int main(int argc, char **argv) {
 //        a = 0.65;
 //    }
 
-//    if ((lResult = hathaani.Perform(pitches, bowChangeIdx, amplitude, 0.5, TRANSPOSE)) != kNoError) {
-//        Hathaani::LogError("Perform", lResult, 0);
+//    for (unsigned int i=0; i<amplitude.size(); ++i) {
+//        amplitude[i] = i * 1.f / amplitude.size();
+//    }
+//
+    if ((lResult = hathaani.Perform(pitches, bowChangeIdx, amplitude, 0.25, TRANSPOSE)) != kNoError) {
+        LOG_ERROR("Perform error");
+        return EXIT_FAILURE;
+    }
+//    if ((lResult = hathaani.Play(0.5)) != kNoError) {
+//        LOG_ERROR("Play Error");
 //        return EXIT_FAILURE;
 //    }
 
-    hathaani.Perform(Hathaani::Key::C, Hathaani::Mode::Major, 500, 0.5);
+//    hathaani.Perform(Hathaani::Key::C, Hathaani::Mode::Major, 500, 0.5);
 
     // Use interval of 500 for Khandippu and 400 for the rest
 //    if ((lResult = hathaani.Perform(Hathaani::Khandippu, 0, 500, 0.5)) != kNoError)
 //    {
-//        Hathaani::LogError("Play", lResult, 0);
+//        LOG_ERROR("Play error");
 //        return lResult;
 //    }
 

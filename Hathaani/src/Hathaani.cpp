@@ -24,7 +24,7 @@ Hathaani::~Hathaani() {
 
     if (m_pCTuner)
         if (m_bTunerOn) {
-            m_pCTuner->Reset();
+            m_pCTuner->reset();
             CTuner::Destroy(m_pCTuner);
         }
 
@@ -33,37 +33,44 @@ Hathaani::~Hathaani() {
     delete m_pCommHandler;
 }
 
-Error_t Hathaani::Init(bool shouldHome, bool usePitchCorrection) {
-    Error_t lResult;
+Error_t Hathaani::init(bool shouldHome, bool usePitchCorrection) {
+    Error_t err;
 //    BOOL oIsFault = 0;
     m_bShouldHome = shouldHome;
     m_bUsePitchCorrection = usePitchCorrection;
 
+    //init communication handlers
     m_pCommHandler = new CommHandler(CommHandler::I2C);
-    m_pFingerController = new FingerController(m_pCommHandler);
+    if (!m_pCommHandler->isInitialized()) {
+        err = kNotInitializedError;
+        LOG_ERROR("Commhandler init Error");
+        return err;
+    }
+    auto* pPortHandler = m_pCommHandler->getDxlPortHandler();
 
-    if (!m_pFingerController->IsInitialized()) {
-        lResult = kNotInitializedError;
-        LogError("FingerInitError", lResult, ulErrorCode);
-        return lResult;
+    m_pFingerController = new FingerController(m_pCommHandler, *pPortHandler);
+    if (!m_pFingerController->isInitialized()) {
+        err = kNotInitializedError;
+        LOG_ERROR("FingerInitError");
+        return err;
     }
 
     if (shouldHome) {
-        lResult = m_pFingerController->SetHome();
-        if (lResult != kNoError) {
-            LogError("SetHome", lResult, ulErrorCode);
-            return lResult;
+        err = m_pFingerController->setHome();
+        if (err != kNoError) {
+            LOG_ERROR("Set Home Error");
+            return err;
         }
     }
 
-    if ((lResult = BowController::Create(m_pBowController)) != kNoError) {
-        LogError("BowControllerCreationError", lResult, ulErrorCode);
-        return lResult;
+    if ((err = BowController::Create(m_pBowController)) != kNoError) {
+        LOG_ERROR("Bow controller create error");
+        return err;
     }
 
-    if ((lResult = m_pBowController->Init(m_pCommHandler, &m_iRTPosition)) != kNoError) {
-        LogError("BowControllerInitError", lResult, ulErrorCode);
-        return lResult;
+    if ((err = m_pBowController->Init(m_pCommHandler, *pPortHandler, &m_iRTPosition)) != kNoError) {
+        LOG_ERROR("Bow controller Init Error.");
+        return err;
     }
 
     // Tuner
@@ -85,8 +92,10 @@ void Hathaani::LogError(const string &functionName, Error_t p_lResult, unsigned 
 }
 
 Error_t Hathaani::UpdateTargetPosition() {
-    long targetPosition = Util::Fret2Position(m_fFretPosition);
-    return m_pFingerController->MoveToPositionl(targetPosition);
+    long targetPosition = Util::fret2Position(m_fFretPosition);
+//    std::cout << targetPosition << std::endl;
+//    return kNoError;
+    return m_pFingerController->moveToPositionl(targetPosition);
 }
 
 void Hathaani::TrackTargetPosition() {
@@ -100,47 +109,48 @@ void Hathaani::TrackTargetPosition() {
     }
 }
 
-Error_t Hathaani::Perform(const std::vector<float>& pitches, const std::vector<size_t>& bowChange, float amplitude, int8_t transpose) {
-//Error_t Hathaani::Perform(const double *pitches, const size_t& length, const std::vector<size_t>& bowChange, float amplitude, int8_t transpose) {
-    auto err = m_pFingerController->SetPositionProfile(4000, 25000);
-//    auto err = m_pFingerController->ActivatePositionMode();
-    if (err != kNoError)
-        return err;
-
-    m_pFingerController->Rest();
-
-    // Go to first note's position
-    m_fFretPosition = pitches[0] + transpose;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-    err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
-    if (err != kNoError)
-        return err;
-
-    size_t bowIdx = 0;
-    for (size_t i=0; i < pitches.size(); i++) {
-        if (bowIdx < bowChange.size())
-            if (bowChange[bowIdx] == i) {
-                m_pBowController->ChangeDirection();
-                m_pBowController->SetAmplitude(amplitude, kNoError);
-                bowIdx++;
-            }
-        float p = pitches[i] + transpose;
-//        std::cout << p << std::endl;
-        if (p >= 0.0) {
-            m_pFingerController->On();
-            m_fFretPosition = p;
-        } else {
-//            m_fingerController->Off();
-        }
-        std::this_thread::sleep_for(std::chrono::microseconds(5500)); // number depends on hopsize of pitch track
-    }
-
-    std::this_thread::sleep_for(std::chrono::seconds (1));
-
-    m_pBowController->StopBowing(kNoError);
-    return m_pFingerController->Rest();
-}
+//Error_t Hathaani::Perform(const std::vector<float>& pitches, const std::vector<size_t>& bowChange, float amplitude, int8_t transpose) {
+////Error_t Hathaani::Perform(const double *pitches, const size_t& length, const std::vector<size_t>& bowChange, float amplitude, int8_t transpose) {
+//    auto err = m_pFingerController->SetPositionProfile(4000, 25000);
+////    auto err = m_pFingerController->ActivatePositionMode();
+//    if (err != kNoError)
+//        return err;
+//
+//    m_pFingerController->Rest();
+//
+//    // Go to first note's position
+//    m_fFretPosition = pitches[0] + transpose;
+//    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+//
+//    m_pFingerController->On();
+//    err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
+//    if (err != kNoError)
+//        return err;
+//
+//    size_t bowIdx = 0;
+//    for (size_t i=0; i < pitches.size(); i++) {
+//        if (bowIdx < bowChange.size())
+//            if (bowChange[bowIdx] == i) {
+//                m_pBowController->changeDirection();
+//                m_pBowController->setAmplitude(amplitude, kNoError);
+//                bowIdx++;
+//            }
+//        float p = pitches[i] + transpose;
+////        std::cout << p << std::endl;
+//        if (p >= 0.0) {
+//            m_fFretPosition = p;
+//        }
+////        else {
+////            m_pFingerController->Off();
+////        }
+//        std::this_thread::sleep_for(std::chrono::microseconds(5500)); // number depends on hopsize of pitch track
+//    }
+//
+//    std::this_thread::sleep_for(std::chrono::seconds (1));
+//
+//    m_pBowController->stopBowing(kNoError);
+//    return m_pFingerController->Rest();
+//}
 
 Error_t Hathaani::Perform(const vector<float> &pitches, const vector<size_t> &bowChange, const vector<float> &amplitude, float maxAmplitude, int8_t transpose)
 {
@@ -164,7 +174,13 @@ Error_t Hathaani::Perform(const vector<float> &pitches, const vector<size_t> &bo
 
     }
     m_fFretPosition = firstPitch + transpose;
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    err = m_pBowController->setString(BowController::String::D);
+    if (err != kNoError)
+        return err;
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    m_pFingerController->On();
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     err = m_pBowController->StartBowing(maxAmplitude, Bow::Down, err);
     if (err != kNoError)
         return err;
@@ -173,18 +189,17 @@ Error_t Hathaani::Perform(const vector<float> &pitches, const vector<size_t> &bo
 //        auto now = std::chrono::steady_clock::now();
         if (bowIdx < bowChange.size())
             if (bowChange[bowIdx] == i) {
-                m_pBowController->ChangeDirection();
-//                m_pBowController->SetAmplitude(maxAmplitude);
+                m_pBowController->changeDirection();
                 bowIdx++;
             }
 
         if (i%50 == 0)
-            m_pBowController->SetAmplitude(amplitude[i] * maxAmplitude);
+            m_pBowController->setAmplitude(amplitude[i] * maxAmplitude);
         float p = pitches[i] + transpose;
-//        std::cout << p << std::endl;
+
         if (pitches[i] >= 0.0) {
-            m_pFingerController->On();
             m_fFretPosition = p;
+            m_pFingerController->On();
         } else {
 //            std::cout << pitches[i] << std::endl;
             m_pFingerController->Off();
@@ -193,8 +208,8 @@ Error_t Hathaani::Perform(const vector<float> &pitches, const vector<size_t> &bo
         std::this_thread::sleep_for(std::chrono::microseconds(5500)); // number depends on hopsize of pitch track
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    m_pBowController->StopBowing(kNoError);
+//    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    m_pBowController->stopBowing(kNoError);
     std::this_thread::sleep_for(std::chrono::seconds (1));
     return m_pFingerController->Rest();
 }
@@ -223,55 +238,49 @@ Error_t Hathaani::Perform(Hathaani::Key key, Hathaani::Mode mode, int interval_m
         return err;
     }
 
-    int n = (int) positions.size();
-    err = m_pFingerController->Rest();
-    err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
-    if (err != kNoError)
-        return err;
-    for (float position : positions) {
-        m_fFretPosition = position;
-
-        if (m_fFretPosition >= .5) {
-            err = m_pFingerController->On();
-//            std::thread([this] {
-//                m_bInterruptPitchCorrection = false;
-//                PitchCorrect();
-//            }).detach();
-        } else {
-            err = m_pFingerController->Off();
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
-        m_bInterruptPitchCorrection = true;
-        m_pBowController->ChangeDirection();
-        m_pBowController->SetAmplitude(amplitude, err);
-    }
-
-    if (mode != Major_Ascend) {
-        m_pBowController->PauseBowing();
-        m_pBowController->ChangeDirection();
-        std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
-        m_pBowController->SetAmplitude(amplitude, err);
-        for (int i = n - 1; i > -1; --i) {
-            m_fFretPosition = positions[i];
-
-            if (m_fFretPosition >= .5) {
-                err = m_pFingerController->On();
-//            std::thread([this] {
-//                m_bInterruptPitchCorrection = false;
-//                PitchCorrect();
-//            }).detach();
-            } else {
-                err = m_pFingerController->Off();
-            }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
-            m_bInterruptPitchCorrection = true;
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, err);
-        }
-    }
-    m_pBowController->StopBowing(err);
+    m_fFretPosition = 0;
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+//    int n = (int) positions.size();
+//    err = m_pFingerController->Rest();
+////    err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
+//    if (err != kNoError)
+//        return err;
+//    for (float position : positions) {
+//        m_fFretPosition = position;
+//
+//        if (m_fFretPosition >= .5) {
+//            err = m_pFingerController->On();
+//        } else {
+//            err = m_pFingerController->Off();
+//        }
+//
+//        std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
+//        m_bInterruptPitchCorrection = true;
+//        m_pBowController->changeDirection();
+//        m_pBowController->setAmplitude(amplitude, err);
+//    }
+//
+//    if (mode != Major_Ascend) {
+//        m_pBowController->PauseBowing();
+//        m_pBowController->changeDirection();
+//        std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
+//        m_pBowController->setAmplitude(amplitude, err);
+//        for (int i = n - 1; i > -1; --i) {
+//            m_fFretPosition = positions[i];
+//
+//            if (m_fFretPosition >= .5) {
+//                err = m_pFingerController->On();
+//            } else {
+//                err = m_pFingerController->Off();
+//            }
+//
+//            std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
+//            m_bInterruptPitchCorrection = true;
+//            m_pBowController->changeDirection();
+//            m_pBowController->setAmplitude(amplitude, err);
+//        }
+//    }
+//    m_pBowController->stopBowing(err);
     std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
     return m_pFingerController->Rest();
 }
@@ -347,13 +356,13 @@ Error_t Hathaani::Play(float amplitude) {
         auto t = (useconds_t)(timeArohanam[i] * 1000000 / 1.25);
         std::this_thread::sleep_for(std::chrono::microseconds(t));
         if (i == 12) { // Pa
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
+            m_pBowController->changeDirection();
+            m_pBowController->setAmplitude(amplitude, kNoError);
         }
     }
-    m_pBowController->SetAmplitude(0, kNoError);
-    m_pBowController->ChangeDirection();
-    m_pBowController->SetAmplitude(amplitude, kNoError);
+    m_pBowController->setAmplitude(0, kNoError);
+    m_pBowController->changeDirection();
+    m_pBowController->setAmplitude(amplitude, kNoError);
     for (int i = 0; i < (int)positionAvarohanam.size(); i++) {
         m_fFretPosition = positionAvarohanam[i] - 1;
         if (m_fFretPosition >= 1)
@@ -368,12 +377,12 @@ Error_t Hathaani::Play(float amplitude) {
         auto t = (useconds_t)(timeAvarohanam[i] * 1000000 / 1.25);
         std::this_thread::sleep_for(std::chrono::microseconds(t));
         if (i == 9) { // Ma
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
+            m_pBowController->changeDirection();
+            m_pBowController->setAmplitude(amplitude, kNoError);
         }
     }
 
-    err = m_pBowController->StopBowing(err);
+    err = m_pBowController->stopBowing(err);
     if (err != kNoError)
         return err;
     return m_pFingerController->Rest();
@@ -410,11 +419,11 @@ Error_t Hathaani::Play(float amplitude) {
 //        std::this_thread::sleep_for(std::chrono::microseconds(t));
 //
 //        if (bowChange[i+1])
-//            m_bowController->ChangeDirection();
-//        m_bowController->SetAmplitude(amplitude, kNoError);
+//            m_bowController->changeDirection();
+//        m_bowController->setAmplitude(amplitude, kNoError);
 //    }
 //
-//    err = m_bowController->StopBowing(err);
+//    err = m_bowController->stopBowing(err);
 //    if (err != kNoError)
 //        return err;
 //
@@ -490,7 +499,7 @@ void Hathaani::SetupTuner() {
     if (m_pCTuner->Start() != kNoError) {
         LogInfo("Tuner Start failed. Tuner will be switched off...");
         m_bTunerOn = false;
-        m_pCTuner->Reset();
+        m_pCTuner->reset();
         CTuner::Destroy(m_pCTuner);
         m_pCTuner = nullptr;
         return;
@@ -554,18 +563,18 @@ Error_t Hathaani::PerformSpurita(int exampleNumber, int interval_ms, float ampli
     m_pFingerController->Rest();
 
     // Go to first note's position
-    err = m_pFingerController->MoveToPosition(position[0]);
+    err = m_pFingerController->moveToPosition(position[0]);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
     if (err != kNoError)
         return err;
     for (int i = 0; i < (int)position.size(); ++i) {
         if (bowChange[i]) {
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
+            m_pBowController->changeDirection();
+            m_pBowController->setAmplitude(amplitude, kNoError);
         }
         m_fFretPosition = position[i] - 1;
-        err = m_pFingerController->MoveToPosition(m_fFretPosition);
+        err = m_pFingerController->moveToPosition(m_fFretPosition);
         if (err != kNoError) {
             return m_pFingerController->Rest();;
         }
@@ -582,7 +591,7 @@ Error_t Hathaani::PerformSpurita(int exampleNumber, int interval_ms, float ampli
         auto t = (useconds_t)(time[i] * interval_ms * 1000);
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
-    m_pBowController->StopBowing(err);
+    m_pBowController->stopBowing(err);
     return m_pFingerController->Rest();
 }
 
@@ -621,7 +630,7 @@ Error_t Hathaani::PerformJaaru(int exampleNumber, int interval_ms, float amplitu
     m_pFingerController->Rest();
 
     // Go to first note's position
-    err = m_pFingerController->MoveToPosition(position[0]);
+    err = m_pFingerController->moveToPosition(position[0]);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
@@ -631,8 +640,8 @@ Error_t Hathaani::PerformJaaru(int exampleNumber, int interval_ms, float amplitu
     for (int i = 0; i < (int)position.size(); ++i) {
 
         if (bowChange[i]) {
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
+            m_pBowController->changeDirection();
+            m_pBowController->setAmplitude(amplitude, kNoError);
         }
 
         if (i ==11 && exampleNumber == 1) {
@@ -645,7 +654,7 @@ Error_t Hathaani::PerformJaaru(int exampleNumber, int interval_ms, float amplitu
         }
 
         m_fFretPosition = position[i] - 1;
-        err = m_pFingerController->MoveToPosition(m_fFretPosition);
+        err = m_pFingerController->moveToPosition(m_fFretPosition);
         if (err != kNoError) {
             return m_pFingerController->Rest();;
         }
@@ -663,7 +672,7 @@ Error_t Hathaani::PerformJaaru(int exampleNumber, int interval_ms, float amplitu
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    m_pBowController->StopBowing(err);
+    m_pBowController->stopBowing(err);
 
     return m_pFingerController->Rest();
 }
@@ -698,7 +707,7 @@ Error_t Hathaani::PerformNokku(int exampleNumber, int interval_ms, float amplitu
     m_pFingerController->Rest();
 
     // Go to first note's position
-    err = m_pFingerController->MoveToPosition(position[0]);
+    err = m_pFingerController->moveToPosition(position[0]);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
@@ -708,12 +717,12 @@ Error_t Hathaani::PerformNokku(int exampleNumber, int interval_ms, float amplitu
     for (int i = 0; i < (int)position.size(); ++i) {
 
         if (bowChange[i]) {
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
+            m_pBowController->changeDirection();
+            m_pBowController->setAmplitude(amplitude, kNoError);
         }
 
         m_fFretPosition = position[i] - 1;
-        err = m_pFingerController->MoveToPosition(m_fFretPosition);
+        err = m_pFingerController->moveToPosition(m_fFretPosition);
 
         if (err != kNoError)
             return m_pFingerController->Rest();
@@ -731,7 +740,7 @@ Error_t Hathaani::PerformNokku(int exampleNumber, int interval_ms, float amplitu
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    err = m_pBowController->StopBowing(err);
+    err = m_pBowController->stopBowing(err);
     return m_pFingerController->Rest();
 }
 
@@ -747,7 +756,7 @@ Error_t Hathaani::PerformOdukkal(int interval_ms, float amplitude)
 
     m_pFingerController->Rest();
     // Go to first note's position
-    err = m_pFingerController->MoveToPosition(position[0]);
+    err = m_pFingerController->moveToPosition(position[0]);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
@@ -756,12 +765,12 @@ Error_t Hathaani::PerformOdukkal(int interval_ms, float amplitude)
 
     for (int i = 0; i < (int)position.size(); ++i) {
         if (bowChange[i] == 1) {
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
+            m_pBowController->changeDirection();
+            m_pBowController->setAmplitude(amplitude, kNoError);
         }
 
         m_fFretPosition = position[i] - 1;
-        err = m_pFingerController->MoveToPosition(m_fFretPosition);
+        err = m_pFingerController->moveToPosition(m_fFretPosition);
         if (err != kNoError)
             return m_pFingerController->Rest();
 
@@ -778,7 +787,7 @@ Error_t Hathaani::PerformOdukkal(int interval_ms, float amplitude)
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    m_pBowController->StopBowing(err);
+    m_pBowController->stopBowing(err);
     return m_pFingerController->Rest();
 }
 
@@ -795,7 +804,7 @@ Error_t Hathaani::PerformOrikkai(int interval_ms, float amplitude)
     m_pFingerController->Rest();
 
     // Go to first note's position
-    err = m_pFingerController->MoveToPosition(position[0]);
+    err = m_pFingerController->moveToPosition(position[0]);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
@@ -804,12 +813,12 @@ Error_t Hathaani::PerformOrikkai(int interval_ms, float amplitude)
 
     for (int i = 0; i < (int)position.size(); ++i) {
         if (bowChange[i]) {
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
+            m_pBowController->changeDirection();
+            m_pBowController->setAmplitude(amplitude, kNoError);
         }
 
         m_fFretPosition = position[i] - 1;
-        err = m_pFingerController->MoveToPosition(m_fFretPosition);
+        err = m_pFingerController->moveToPosition(m_fFretPosition);
         if (err != kNoError)
             return m_pFingerController->Rest();
 
@@ -826,7 +835,7 @@ Error_t Hathaani::PerformOrikkai(int interval_ms, float amplitude)
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    m_pBowController->StopBowing(err);
+    m_pBowController->stopBowing(err);
     return m_pFingerController->Rest();
 }
 
@@ -843,21 +852,21 @@ Error_t Hathaani::PerformKhandippu(int interval_ms, float amplitude)
     m_pFingerController->Rest();
 
     // Go to first note's position
-    err = m_pFingerController->MoveToPosition(position[0]);
+    err = m_pFingerController->moveToPosition(position[0]);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-    err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
-    if (err != kNoError)
-        return err;
+//    err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
+//    if (err != kNoError)
+//        return err;
 
     for (int i = 0; i < (int)position.size(); ++i) {
-        if (bowChange[i]) {
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
-        }
+//        if (bowChange[i]) {
+//            m_pBowController->changeDirection();
+//            m_pBowController->setAmplitude(amplitude, kNoError);
+//        }
 
         m_fFretPosition = position[i] - 1;
-        err = m_pFingerController->MoveToPosition(m_fFretPosition);
+        err = m_pFingerController->moveToPosition(m_fFretPosition);
         if (err != kNoError)
             return m_pFingerController->Rest();
 
@@ -874,7 +883,7 @@ Error_t Hathaani::PerformKhandippu(int interval_ms, float amplitude)
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    m_pBowController->StopBowing(err);
+//    m_pBowController->stopBowing(err);
     return m_pFingerController->Rest();
 }
 
@@ -921,7 +930,7 @@ Error_t Hathaani::PerformKampita(int exampleNumber, int interval_ms, float ampli
     m_pFingerController->Rest();
 
     // Go to first note's position
-    err = m_pFingerController->MoveToPosition(position[0]);
+    err = m_pFingerController->moveToPosition(position[0]);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     err = m_pBowController->StartBowing(amplitude, Bow::Down, err);
@@ -935,12 +944,12 @@ Error_t Hathaani::PerformKampita(int exampleNumber, int interval_ms, float ampli
         }
 
         if (bowChange[i] == 1) {
-            m_pBowController->ChangeDirection();
-            m_pBowController->SetAmplitude(amplitude, kNoError);
+            m_pBowController->changeDirection();
+            m_pBowController->setAmplitude(amplitude, kNoError);
         }
 
         m_fFretPosition = position[i] - 1;
-        err = m_pFingerController->MoveToPosition(m_fFretPosition);
+        err = m_pFingerController->moveToPosition(m_fFretPosition);
         if (err != kNoError)
             return m_pFingerController->Rest();
 
@@ -958,7 +967,7 @@ Error_t Hathaani::PerformKampita(int exampleNumber, int interval_ms, float ampli
         std::this_thread::sleep_for(std::chrono::microseconds(t));
     }
 
-    m_pBowController->StopBowing(err);
+    m_pBowController->stopBowing(err);
     return m_pFingerController->Rest();;
 }
 
@@ -969,11 +978,11 @@ Error_t Hathaani::ApplyRosin(int time)
     {
         auto err = m_pBowController->RosinMode();
         if (err != kNoError) {
-            return m_pBowController->StopBowing();
+            return m_pBowController->stopBowing();
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(time / 10));
-        m_pBowController->ChangeDirection();
+        m_pBowController->changeDirection();
     }
-    return m_pBowController->StopBowing();
+    return m_pBowController->stopBowing();
 }

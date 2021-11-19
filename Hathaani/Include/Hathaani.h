@@ -14,6 +14,7 @@
 #include <thread>
 #include <sstream>
 
+#include "Logger.h"
 #include "Dynamixel.h"
 #include "EposController.h"
 #include "MyDefinitions.h"
@@ -53,10 +54,10 @@ public:
     Hathaani();
     ~Hathaani();
 
-    Error_t Init(bool shouldHome = true, bool usePitchCorrection = false);
+    Error_t init(bool shouldHome = true, bool usePitchCorrection = false);
 
     Error_t ApplyRosin(int time = 10 /* sec */);
-    Error_t Perform(const std::vector<float>& pitches, const std::vector<size_t>& bowChange, float amplitude, int8_t transpose);
+//    Error_t Perform(const std::vector<float>& pitches, const std::vector<size_t>& bowChange, float amplitude, int8_t transpose);
     Error_t Perform(const std::vector<float>& pitches, const std::vector<size_t>& bowChange, const std::vector<float>& amplitude, float maxAmplitude, int8_t transpose);
 //    Error_t Perform(const double* pitches, const size_t& length, const std::vector<size_t>& bowChange, float amplitude, int8_t transpose);
     Error_t Perform(Key key, Mode mode, int interval_ms, float amplitude, short transpose=0);
@@ -107,7 +108,7 @@ private:
 
     EposController::OperationMode m_operationMode = EposController::Position;
 
-    // Communication Handler
+    // Communication Handlers
     CommHandler* m_pCommHandler;
 
     // Bowing

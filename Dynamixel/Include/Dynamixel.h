@@ -8,20 +8,28 @@
 #include "cmath"
 #include "string"
 #include "iostream"
+#include "MyDefinitions.h"
 #include <dynamixel_sdk.h>
+
+#ifndef FAIL
+#define FAIL 1
+#endif
+
+#ifndef SUCCESS
+#define SUCCESS 0
+#endif
 
 #define ADDR_TORQUE_ENABLE          64
 #define ADDR_GOAL_POSITION          116
 #define ADDR_GOAL_CURRENT           102
 #define ADDR_PRESENT_POSITION       132
 #define ADDR_OPERATING_MODE         11
+#define ADDR_MOVING                 122
 
 #define MINIMUM_POSITION_LIMIT      0  // Refer to the Minimum Position Limit of product eManual
 #define MAXIMUM_POSITION_LIMIT      4095  // Refer to the Maximum Position Limit of product eManual
 #define UNIT_CURRENT                2.69    // mA
 #define DEG_PULSE                   (360.f/4096.f)  //  deg/pulse
-
-#define BAUDRATE                    57600
 
 #define PROTOCOL_VERSION  2.0
 
@@ -56,7 +64,7 @@ public:
 
     int setBaudRate(int iBaudrate = -1) {
         if(iBaudrate < 0)
-            iBaudrate = BAUDRATE;
+            iBaudrate = DXL_BAUDRATE;
 
         if (m_pPortHandler->setBaudRate(iBaudrate))
             return 0;
@@ -100,6 +108,8 @@ public:
 
     [[maybe_unused]] int moveToPosition(float angle, bool isRadian = false);
     [[maybe_unused]] int getCurrentPosition(float& current_angle, bool isRadian = false);
+
+    bool isMoving();
 
 private:
     int m_id;

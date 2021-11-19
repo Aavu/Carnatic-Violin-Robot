@@ -16,7 +16,7 @@ EposController::~EposController()
     CloseDevice();
 }
 
-Error_t EposController::Init(OperationMode mode)
+Error_t EposController::init(OperationMode mode)
 {
 #ifdef __arm__
     BOOL oIsFault = 0;
@@ -244,7 +244,7 @@ Error_t EposController::SetVelocityProfile(unsigned long ulAcc)
     return kNoError;
 }
 
-Error_t EposController::MoveToPositionl(long targetPos)
+Error_t EposController::moveToPositionl(long targetPos)
 {
 #ifdef __arm__
     if (m_iNodeID != 1) // Only applicable to Finger
@@ -254,14 +254,14 @@ Error_t EposController::MoveToPositionl(long targetPos)
     unsigned int errorCode = 0;
 
     if (m_operationMode == ProfilePosition) {
-        if (VCS_MoveToPosition(pKeyHandle, m_iNodeID, targetPos, 1, 1, &errorCode) == 0) {
+        if (VCS_MoveToPosition(pKeyHandle, m_iNodeID, targetPos*m_iEncoderDirection, 1, 1, &errorCode) == 0) {
             lResult = kSetValueError;
             std::cerr << "VCS_MoveToPosition" << std::endl;
             return lResult;
         }
     } else if (m_operationMode == Position) {
         if (std::abs(targetPos) < std::abs(MAX_ENCODER_INC) && std::abs(targetPos) >= std::abs(NUT_POSITION)) {
-            if (VCS_SetPositionMust(pKeyHandle, m_iNodeID, targetPos, &errorCode) == 0) {
+            if (VCS_SetPositionMust(pKeyHandle, m_iNodeID, targetPos*m_iEncoderDirection, &errorCode) == 0) {
                 std::cerr << "VCS_SetPositionMust" << std::endl;
                 return kSetValueError;
             }
@@ -284,7 +284,7 @@ Error_t EposController::MoveToPosition(long lPos, unsigned long ulAcc, BOOL bAbs
         return lResult;
     }
 
-    if (VCS_MoveToPosition(pKeyHandle, m_iNodeID, lPos, bAbsolute, 1, &errorCode) == 0) {
+    if (VCS_MoveToPosition(pKeyHandle, m_iNodeID, lPos*m_iEncoderDirection, bAbsolute, 1, &errorCode) == 0) {
         lResult = kSetValueError;
         std::cerr << "VCS_MoveToPosition" << std::endl;
         return lResult;
@@ -300,7 +300,7 @@ Error_t EposController::MoveToPosition(long lPos, unsigned long ulAcc, BOOL bAbs
     return kNoError;
 }
 
-Error_t EposController::SetHome()
+Error_t EposController::setHome()
 {
 #ifdef __arm__
     Error_t lResult = kNoError;
@@ -309,7 +309,7 @@ Error_t EposController::SetHome()
     unsigned int errorCode = 0;
     ActivateProfilePositionMode();
     while (true) {
-        if (MoveToPosition(-25*m_iEncoderDirection, 1000, 0) != kNoError) {
+        if (MoveToPosition(-25, 1000, 0) != kNoError) {
             lResult = kSetValueError;
             std::cerr << "moveToPosition" << std::endl;
             return lResult;

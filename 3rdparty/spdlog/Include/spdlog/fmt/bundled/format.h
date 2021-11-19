@@ -652,7 +652,7 @@ class basic_memory_buffer : private Allocator, public internal::buffer<T> {
   ~basic_memory_buffer() FMT_OVERRIDE { deallocate(); }
 
  private:
-  // Move data from other to this buffer.
+  // move data from other to this buffer.
   void move(basic_memory_buffer& other) {
     Allocator &this_alloc = *this, &other_alloc = other;
     this_alloc = std::move(other_alloc);

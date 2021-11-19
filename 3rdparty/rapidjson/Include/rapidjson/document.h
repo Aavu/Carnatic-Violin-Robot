@@ -114,14 +114,14 @@ public:
     GenericValue<Encoding, Allocator> value;    //!< value of member.
 
 #if RAPIDJSON_HAS_CXX11_RVALUE_REFS
-    //! Move constructor in C++11
+    //! move constructor in C++11
     GenericMember(GenericMember&& rhs) RAPIDJSON_NOEXCEPT
         : name(std::move(rhs.name)),
           value(std::move(rhs.value))
     {
     }
 
-    //! Move assignment in C++11
+    //! move assignment in C++11
     GenericMember& operator=(GenericMember&& rhs) RAPIDJSON_NOEXCEPT {
         return *this = static_cast<GenericMember&>(rhs);
     }
@@ -679,7 +679,7 @@ public:
     GenericValue() RAPIDJSON_NOEXCEPT : data_() { data_.f.flags = kNullFlag; }
 
 #if RAPIDJSON_HAS_CXX11_RVALUE_REFS
-    //! Move constructor in C++11
+    //! move constructor in C++11
     GenericValue(GenericValue&& rhs) RAPIDJSON_NOEXCEPT : data_(rhs.data_) {
         rhs.data_.f.flags = kNullFlag; // give up contents
     }
@@ -694,7 +694,7 @@ private:
     template <typename StackAllocator>
     GenericValue(GenericDocument<Encoding,Allocator,StackAllocator>&& rhs);
 
-    //! Move assignment from a GenericDocument is not permitted.
+    //! move assignment from a GenericDocument is not permitted.
     template <typename StackAllocator>
     GenericValue& operator=(GenericDocument<Encoding,Allocator,StackAllocator>&& rhs);
 #endif
@@ -921,7 +921,7 @@ public:
     }
 
 #if RAPIDJSON_HAS_CXX11_RVALUE_REFS
-    //! Move assignment in C++11
+    //! move assignment in C++11
     GenericValue& operator=(GenericValue&& rhs) RAPIDJSON_NOEXCEPT {
         return *this = rhs.Move();
     }
@@ -1556,7 +1556,7 @@ public:
 
         MemberIterator last(GetMembersPointer() + (data_.o.size - 1));
         if (data_.o.size > 1 && m != last)
-            *m = *last; // Move the last one to this place
+            *m = *last; // move the last one to this place
         else
             m->~Member(); // Only one left, just destroy
         --data_.o.size;
@@ -2234,7 +2234,7 @@ public:
     }
 
 #if RAPIDJSON_HAS_CXX11_RVALUE_REFS
-    //! Move constructor in C++11
+    //! move constructor in C++11
     GenericDocument(GenericDocument&& rhs) RAPIDJSON_NOEXCEPT
         : ValueType(std::forward<ValueType>(rhs)), // explicit cast to avoid prohibited move from Document
           allocator_(rhs.allocator_),
@@ -2253,7 +2253,7 @@ public:
     }
 
 #if RAPIDJSON_HAS_CXX11_RVALUE_REFS
-    //! Move assignment in C++11
+    //! move assignment in C++11
     GenericDocument& operator=(GenericDocument&& rhs) RAPIDJSON_NOEXCEPT
     {
         // The cast to ValueType is necessary here, because otherwise it would
@@ -2319,7 +2319,7 @@ public:
         ClearStackOnExit scope(*this);
         if (g(*this)) {
             RAPIDJSON_ASSERT(stack_.GetSize() == sizeof(ValueType)); // Got one and only one root object
-            ValueType::operator=(*stack_.template Pop<ValueType>(1));// Move value from stack to document
+            ValueType::operator=(*stack_.template Pop<ValueType>(1));// move value from stack to document
         }
         return *this;
     }
@@ -2342,7 +2342,7 @@ public:
         parseResult_ = reader.template Parse<parseFlags>(is, *this);
         if (parseResult_) {
             RAPIDJSON_ASSERT(stack_.GetSize() == sizeof(ValueType)); // Got one and only one root object
-            ValueType::operator=(*stack_.template Pop<ValueType>(1));// Move value from stack to document
+            ValueType::operator=(*stack_.template Pop<ValueType>(1));// move value from stack to document
         }
         return *this;
     }

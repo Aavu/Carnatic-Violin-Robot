@@ -9,6 +9,7 @@
 #include <cstring>
 #include <cmath>
 
+#include "Finger.h"
 #include "EposController.h"
 #include "MyDefinitions.h"
 #include "CommHandler.h"
@@ -23,29 +24,29 @@ class FingerController: public EposController {
     inline static const std::string kName = "FingerController";
 
 public:
-    explicit FingerController(CommHandler* pCommHandler);
+    FingerController(CommHandler* pCommHandler, PortHandler& portHandler);
     ~FingerController() override;
 //    static Error_t Create(FingerController* &pFinger);
 //    static Error_t Destroy(FingerController* &pFinger);
 
-//    Error_t Init();
+//    Error_t init();
 
-    [[nodiscard]] bool IsInitialized() const;
+    [[nodiscard]] bool isInitialized() const;
     Error_t Reset();
 
-    Error_t Move(uint8_t value);
+    Error_t move(uint8_t value);
 
 //    Error_t UpdatePosition(int position);
 
-    Error_t SetHome() override;
+    Error_t setHome() override;
 
     Error_t Rest();
     Error_t On();
     Error_t Off();
 
 //    Error_t SetPositionProfile(unsigned long ulVelocity = 2500, unsigned long ulAcc = 10000);
-//    Error_t MoveToPosition(long targetPos);
-    Error_t MoveToPosition(float fFretPosition);
+//    Error_t moveToPosition(long targetPos);
+    Error_t moveToPosition(float fFretPosition);
 
 private:
     enum State {
@@ -64,12 +65,13 @@ private:
 
 //    EposController m_indexController;
 
+    Finger m_finger;
     CommHandler* m_pCommHandler;
 
-    static uint8_t GetPosition(State state);
+    static float GetPosition(State state);
 //    static int Constrain(int val);
 
-    Error_t SetCurrentState(State c_state, bool b_move = false);
+    Error_t setCurrentState(State c_state, bool bMove = false);
 };
 
 

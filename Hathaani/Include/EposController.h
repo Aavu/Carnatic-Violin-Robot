@@ -36,7 +36,7 @@ public:
     virtual ~EposController();
 
     Error_t OpenDevice();
-    Error_t Init(OperationMode mode);
+    Error_t init(OperationMode mode);
     Error_t CloseDevice();
 
     Error_t ActivateProfilePositionMode();
@@ -46,17 +46,17 @@ public:
     Error_t SetPositionProfile(unsigned long ulVelocity, unsigned long ulAcc);
     Error_t SetVelocityProfile(unsigned long ulAcc);
 
-    Error_t MoveToPositionl(long targetPos);
+    Error_t moveToPositionl(long targetPos);
     Error_t MoveToPosition(long lPos, unsigned long ulAcc, BOOL bAbsolute, int iTimeOut = 50);
 
     Error_t MoveWithVelocity(long lVelocity);
     Error_t Halt();
 
-    virtual Error_t SetHome();
+    virtual Error_t setHome();
 
 private:
     OperationMode m_operationMode = Position;
-    int m_iEncoderDirection = 1;
+    int m_iEncoderDirection = -1;
 
     HANDLE pKeyHandle = nullptr;
     uint16_t m_iNodeID = 1;

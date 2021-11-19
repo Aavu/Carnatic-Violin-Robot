@@ -11,15 +11,8 @@
 #include "cmath"
 #include "vector"
 
+#include "Logger.h"
 #include "Dynamixel.h"
-
-#ifndef FAIL
-#define FAIL 1
-#endif
-
-#ifndef SUCCESS
-#define SUCCESS 0
-#endif
 
 #define l14 0
 #define l04 1
@@ -28,9 +21,7 @@
 
 #define NUM_ACTUATORS 2
 
-#define MAX_CURRENT 50
-
-#define DEVICENAME  "/dev/tty.usbserial-FT45BADF"
+#define FINGER_HOME_THETA {0,0}
 
 class Link
 {
@@ -51,7 +42,7 @@ public:
     void update(float _x, float _y, float _angle, bool radians = true) {
         x = _x;
         y = _y;
-        angle = (radians) ? angle : deg2rad(angle);
+        angle = (radians) ? _angle : deg2rad(_angle);
         updateTail();
     }
 
@@ -81,9 +72,10 @@ public:
     Error_t init(PortHandler& portHandler);
     Error_t reset();
 
+    void wait();
     Error_t calcIK(float x, float y);
-    Error_t moveToPosition(float x, float y);
-    Error_t moveJoints(float* pfTheta, bool isRadian = false);
+    Error_t moveToPosition(float x, float y, bool bWait = false);
+    Error_t moveJoints(float* pfTheta, bool bWait = false, bool isRadian = false);
     void getDriveAngles(float& angle0, float& angle1) const;
 
     static float map(float x, float in_min, float in_max, float out_min, float out_max) {

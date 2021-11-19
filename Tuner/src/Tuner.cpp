@@ -47,7 +47,7 @@ Error_t CTuner::Init(float* fretPosition) {
     return kNoError;
 }
 
-Error_t CTuner::Reset() {
+Error_t CTuner::reset() {
     m_pCRecorder->Reset();
     CRecorder::Destroy(m_pCRecorder);
 

@@ -15,9 +15,9 @@ target_include_directories(${LOGGER_LIB} PUBLIC ${CMAKE_SOURCE_DIR}/3rdparty/spd
 target_link_directories(${LOGGER_LIB} PUBLIC ${CMAKE_SOURCE_DIR}/3rdparty/spdlog/lib/)
 target_link_libraries(${LOGGER_LIB} PUBLIC spdlog)
 
-target_precompile_headers(${LOGGER_LIB}
-        PUBLIC
-        ${CMAKE_SOURCE_DIR}/Include/pch.h
-        PRIVATE
-        ${CMAKE_SOURCE_DIR}/Logger/Include/spdlog_pch.h
-        )
+#target_precompile_headers(${LOGGER_LIB}
+#        PUBLIC
+#        ${CMAKE_SOURCE_DIR}/Include/pch.h
+#        PRIVATE
+#        ${CMAKE_SOURCE_DIR}/Logger/Include/spdlog_pch.h
+#        )

@@ -21,7 +21,7 @@ public:
 //        return (long)(direction * p * 24000.0 / 220.0);
     }
 
-    static long Fret2Position(float fretPos) {
+    static long fret2Position(float fretPos) {
         return PositionToPulse(FretLength(fretPos)) + NUT_POSITION;
     }
 

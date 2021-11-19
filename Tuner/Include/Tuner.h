@@ -30,7 +30,7 @@ public:
     static Error_t Destroy(CTuner*& pCInstance);
 
     Error_t Init(float* fretPosition);
-    Error_t Reset();
+    Error_t reset();
 
     Error_t Start();
     Error_t Stop();

@@ -12,7 +12,7 @@ Finger::~Finger() {
     reset();
 }
 
-Error_t Finger::moveToPosition(float x, float y) {
+Error_t Finger::moveToPosition(float x, float y, bool bWait) {
     auto ret = calcIK(x, y);
     if (ret != SUCCESS)
         return ret;
@@ -20,9 +20,8 @@ Error_t Finger::moveToPosition(float x, float y) {
     float a[2];
     getDriveAngles(a[0], a[1]);
 
-    std::cout<< a[0] << " " << a[1] << std::endl;
-    return kNoError;
-//    return moveJoints(a, true);
+//    std::cout<< a[0] << " " << a[1] << std::endl;
+    return moveJoints(a, bWait, true);
 }
 
 Error_t Finger::calcIK(float x, float y) {
@@ -32,6 +31,7 @@ Error_t Finger::calcIK(float x, float y) {
     float sq_L01 = sq(x) + sq(y);
     float L01 = std::sqrt(sq_L01);
     float temp = (sq_L01 + sq(j[l14].l) - sq(j[l04].l)) / (2 * L01 * j[l14].l);
+
     if (std::abs(temp) > 1)
         return kNaNError;
     float alpha = std::acos(temp);
@@ -71,6 +71,7 @@ Error_t Finger::calcIK(float x, float y) {
     temp = (sq(L25) + sq(L23) - sq(L35)) / (2 * L25 * L23);
     if (std::abs(temp) > 1)
         return kNaNError;
+
     float phi2 = std::acos(temp);
 
     _theta2 = theta5 + phi2; // Change the sign to invert the inner joint
@@ -111,7 +112,7 @@ Error_t Finger::init(PortHandler& portHandler) {
         m_dxl[i].setGoalCurrent(MAX_CURRENT);
 
         if (m_dxl[i].torque() != 0) {
-            std::cerr << "Cannot set torque on " << i << std::endl;
+            LOG_ERROR("Cannot set torque on {}", i);
             return kSetValueError;
         }
     }
@@ -126,7 +127,7 @@ Error_t Finger::reset() {
     return kNoError;
 }
 
-Error_t Finger::moveJoints(float* pfTheta, bool isRadian) {
+Error_t Finger::moveJoints(float* pfTheta, bool bWait, bool isRadian) {
     if (pfTheta == nullptr)
         return kFunctionIllegalCallError;
 
@@ -136,5 +137,11 @@ Error_t Finger::moveJoints(float* pfTheta, bool isRadian) {
             return kSetValueError;
     }
 
+    if (bWait) wait();
+
     return kNoError;
+}
+
+void Finger::wait() {
+    while (m_dxl[0].isMoving() || m_dxl[1].isMoving());
 }

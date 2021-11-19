@@ -4,7 +4,8 @@
 
 #include "FingerController.h"
 
-FingerController::FingerController(CommHandler* pCommHandler):  EposController(FINGER_EPOS4_USB, 1),
+FingerController::FingerController(CommHandler* pCommHandler,
+                                   PortHandler& portHandler):  EposController(FINGER_EPOS4_USB, 1),
                                                                 prevSentValue(0),
                                                                 m_bInitialized(false),
                                                                 currentState(REST),
@@ -12,14 +13,18 @@ FingerController::FingerController(CommHandler* pCommHandler):  EposController(F
                                                                 m_iCurrentPosition(0),
                                                                 m_pCommHandler(pCommHandler)
 {
-    auto err = EposController::Init(EposController::ProfilePosition);
-    if (err == kNoError)
-        m_bInitialized = true;
+    auto err = EposController::init(EposController::ProfilePosition);
+    if (err != kNoError) {
+        LOG_ERROR("Epos Controller Init failed.");
+        return;
+    }
+    err = m_finger.init(portHandler);
+
+    m_bInitialized = true;
 }
 
 FingerController::~FingerController()
 {
-
 }
 
 Error_t FingerController::Reset() {
@@ -27,7 +32,7 @@ Error_t FingerController::Reset() {
     return kNoError;
 }
 
-Error_t FingerController::Move(uint8_t value) {
+Error_t FingerController::move(uint8_t value) {
     if (!m_bInitialized)
         return kNotInitializedError;
 
@@ -37,18 +42,18 @@ Error_t FingerController::Move(uint8_t value) {
 }
 
 Error_t FingerController::Rest() {
-    return SetCurrentState(REST, true);
+    return setCurrentState(REST, true);
 }
 
 Error_t FingerController::On() {
-    return SetCurrentState(ON, true);
+    return setCurrentState(ON, true);
 }
 
 Error_t FingerController::Off() {
-    return SetCurrentState(OFF, true);
+    return setCurrentState(OFF, true);
 }
 
-uint8_t FingerController::GetPosition(FingerController::State state) {
+float FingerController::GetPosition(FingerController::State state) {
     switch(state) {
         case OFF:
             return FINGER_OFF;
@@ -70,64 +75,47 @@ uint8_t FingerController::GetPosition(FingerController::State state) {
 //    Error_t err = kNoError;
 //    if (pos != prevSentValue) {
 ////        std::cout << pos << std::endl;
-//        err = Move(pos);
+//        err = move(pos);
 //        prevSentValue = pos;
 //    }
 //    return err;
 //}
 
-Error_t FingerController::SetCurrentState(FingerController::State c_state, bool b_move) {
+Error_t FingerController::setCurrentState(FingerController::State c_state, bool bMove) {
     if (c_state == currentState)
         return kNoError;
 
     currentState = c_state;
-    if (b_move) {
-        int pos = GetPosition(currentState);
-        return Move(pos);
+    if (bMove) {
+        auto pos = GetPosition(currentState);
+        return m_finger.moveToPosition(-153, pos, false);
     }
     return kNoError;
 }
 
-Error_t FingerController::MoveToPosition(float fFretPosition)
+Error_t FingerController::moveToPosition(float fFretPosition)
 {
-    return MoveToPositionl(Util::Fret2Position(fFretPosition));
+    return moveToPositionl(Util::fret2Position(fFretPosition));
 }
 
-Error_t FingerController::SetHome()
+Error_t FingerController::setHome()
 {
-    Error_t err = EposController::SetHome();
+    float theta[2] = FINGER_HOME_THETA;
+    Error_t err;
+    err = m_finger.moveJoints(theta, true);
     if (err != kNoError) {
         return err;
     }
 
-    err = m_pCommHandler->Send(Register::kFingerOffMax, FINGER_OFF_MAX);
+    err = EposController::setHome();
     if (err != kNoError) {
-        std::cerr << "Set Value error: kFingerOffMax" << std::endl;
-        return err;
-    }
-
-    err = m_pCommHandler->Send(Register::kFingerOnMax, FINGER_ON_MAX);
-    if (err != kNoError) {
-        std::cerr << "Set Value error: kFingerOnMax" << std::endl;
-        return err;
-    }
-
-    err = m_pCommHandler->Send(Register::kFingerOffMin, FINGER_OFF_MIN);
-    if (err != kNoError) {
-        std::cerr << "Set Value error: kFingerOffMin" << std::endl;
-        return err;
-    }
-
-    err = m_pCommHandler->Send(Register::kFingerOnMin, FINGER_ON_MIN);
-    if (err != kNoError) {
-        std::cerr << "Set Value error: kFingerOnMin" << std::endl;
         return err;
     }
 
     return m_pCommHandler->Send(Register::kEncoderSetHome, 0);
 }
 
-bool FingerController::IsInitialized() const
+bool FingerController::isInitialized() const
 {
     return m_bInitialized;
 }
