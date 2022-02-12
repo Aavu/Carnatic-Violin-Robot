@@ -1,5 +1,0 @@
-include_directories(${CMAKE_SOURCE_DIR}/Violinist/include)
-include_directories(${CMAKE_SOURCE_DIR}/Tuner/include)
-include_directories(${CMAKE_SOURCE_DIR}/include)
-add_executable(Violinist main.cpp BowController.cpp FingerController.cpp PitchFileParser.cpp Violinist.cpp EposController.cpp)
-target_link_libraries(Violinist Tuner -lEposCmd -lpthread -lbcm2835)
