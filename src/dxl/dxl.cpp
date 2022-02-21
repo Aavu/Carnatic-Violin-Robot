@@ -82,6 +82,19 @@ int Dynamixel::setGoalCurrent(int16_t iCurrent) {
     return dxl_error;
 }
 
+int Dynamixel::setProfileVelocity(uint16_t uiVelocity) {
+    uint8_t dxl_error = 0;
+    int dxl_comm_result = COMM_TX_FAIL;
+    dxl_comm_result = m_pPacketHandler->write4ByteTxRx(m_pPortHandler, m_id, ADDR_PROFILE_VELOCITY, uiVelocity, &dxl_error);
+    if (dxl_comm_result != COMM_SUCCESS) {
+        LOG_ERROR("%s", m_pPacketHandler->getTxRxResult(dxl_comm_result));
+    } else if (dxl_error != 0) {
+        LOG_ERROR("%s", m_pPacketHandler->getRxPacketError(dxl_error));
+    }
+
+    return dxl_error;
+}
+
 int Dynamixel::moveToPosition(float angle, bool bWait, bool isRadian, long timeout_ms) {
     if (isRadian)
         angle = angle * 180.f / (float) M_PI;

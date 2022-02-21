@@ -46,7 +46,7 @@ int FingerController::init(bool shouldHome) {
     }
 
     m_fingerDxlTimer.stop();
-    m_fingerDxlTimer.setPeriod(FINGER_UPDATE_RATE * 1000);
+    m_fingerDxlTimer.setPeriod(DXL_UPDATE_RATE * 1000);
     m_fingerDxlTimer.attachInterrupt(fingerUpdateCallback);
 
     err = enable(true, false);

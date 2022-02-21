@@ -13,7 +13,7 @@ struct performParam_t {
     float* pitches;
     int32_t* positions;
     int length;
-    int* bowChangeIdx;
+    float* bowTraj;
     int nBowChanges;
     float* amplitude;
     float volume = 1.0;
@@ -43,7 +43,9 @@ public:
      * @param lpf_alpha Zero Phase Lowpass filtering coefficient. 0 means no filtering
      * @return Error code
      */
-    int perform(const performParam_t& param, float lpf_alpha = 0.5);
+    int perform(const performParam_t& param, float lpf_alpha = 0.5, bool shouldBow = true);
+
+    int bowTest(const performParam_t& param);
 
     static void RPDOTimerIRQHandler();
 
@@ -56,7 +58,10 @@ private:
     performParam_t m_performParam;
 
     // Bowing
-    // BowController m_bowController;
+    BowController* m_pBowController;
+    bool m_bShouldBow = true;
+    float m_fBowTestLen_s = 0;
+    int m_iNBows = 1;
 
     // left hand
     HardwareTimer RPDOTimer;

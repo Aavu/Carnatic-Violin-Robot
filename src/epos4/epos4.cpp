@@ -4,7 +4,11 @@
 
 #include "epos4.h"
 
-Epos4::Epos4(FingerController* controller, void (FingerController::* callback)(int32_t)) : m_pFingerController(controller), m_callback(callback) {
+Epos4::Epos4(FingerController* pFingerController, void (FingerController::* pFingerCallback)(int32_t), BowController* pBowController, void (BowController::* pBowCallback)(int32_t)) : m_pFingerController(pFingerController), m_pFingerCallback(pFingerCallback), m_pBowController(pBowController), m_pBowCallback(pBowCallback) {
+
+}
+
+Epos4::Epos4(BowController* pBowController, void (BowController::* pBowCallback)(int32_t)) : m_pBowController(pBowController), m_pBowCallback(pBowCallback) {
 
 }
 
@@ -186,7 +190,7 @@ int Epos4::writeObj(_WORD index, _BYTE subIndex, _DWORD param) {
     LOG_TRACE("CAN Write success");
     while (m_bSDOBusy) {
         // LOG_LOG("sdo busy");
-        delay(1);
+        delay(5);
     }
     // delay(1);
 
@@ -354,7 +358,7 @@ char* Epos4::getOpModeString(OpMode mode) const {
     return "";
 }
 
-int Epos4::setOpMode(OpMode opMode, uint8_t uiInterpolationTime, int8_t iInterpolationIndex) {
+int Epos4::setOpMode(OpMode opMode, uint8_t uiInterpolationTime, int8_t iInterpolationIndex, HomingMethod homingMethod) {
     int n;
     n = writeObj(MODE_OF_OPERATION_ADDR, 0x0, (uint8_t) opMode);
     if (n < 0) {
@@ -365,11 +369,11 @@ int Epos4::setOpMode(OpMode opMode, uint8_t uiInterpolationTime, int8_t iInterpo
 
     switch (opMode) {
     case ProfilePosition:
-        // n = setProfile();
-        // if (n != 0) {
-        //     LOG_ERROR("setProfile");
-        //     return -1;
-        // }
+        n = setProfile();
+        if (n != 0) {
+            LOG_ERROR("setProfile");
+            return -1;
+        }
         break;
 
     case ProfileVelocity:
@@ -381,13 +385,13 @@ int Epos4::setOpMode(OpMode opMode, uint8_t uiInterpolationTime, int8_t iInterpo
         break;
 
     case Homing:
-        n = setHomingMethod(CurrentThresholdPositive);
+        n = setHomingMethod(homingMethod);
         if (n != 0) {
             LOG_ERROR("setHomingMethod");
             return -1;
         }
 
-        n = setHomingCurrentThreshold(1000);
+        n = setHomingCurrentThreshold(2000);
         if (n != 0) {
             LOG_ERROR("setHomingCurrentThreshold");
             return -1;
@@ -633,7 +637,7 @@ int Epos4::moveToPosition(int32_t pos, bool bWait) {
         // refer FW spec table 7-64 -> 
         while (!(stat & 0x400)) {
             err = readStatusWord(&stat);
-            LOG_LOG("wait stat: %h", stat);
+            // LOG_LOG("wait stat: %h", stat);
             if (err < 0) {
                 LOG_ERROR("readStatusWord");
                 return -1;
@@ -665,7 +669,7 @@ int Epos4::moveWithVelocity(int32_t velocity) {
         LOG_ERROR("Write Obj failed. Error code: ", m_uiError);
         return -1;
     }
-
+    delay(10);
     // Start Move
     err = setControlWord(0x000F);
     if (err < 0) {
@@ -694,6 +698,16 @@ int Epos4::startHoming() {
     // This delay is needed for homing to work
     delay(10);
     return setControlWord(0x001F);
+}
+
+int Epos4::SetHomePosition(int32_t iPos) {
+    int n;
+    n = writeObj(0x30B0, 0x00, iPos);
+    if (n < 0) {
+        LOG_ERROR("Write Obj failed. Error code: ", m_uiError);
+        return -1;
+    }
+    return 0;
 }
 
 int Epos4::setCurrentControlParameters() {
@@ -848,11 +862,14 @@ int Epos4::PDO_processMsg(can_message_t& msg) {
     m_iEncoderPosition = ((msg.data[5] & 0xFF) << 24) + ((msg.data[4] & 0xFF) << 16) + ((msg.data[3] & 0xFF) << 8) + msg.data[2];
     m_uiError = ((msg.data[7] & 0xFF) << 8) + msg.data[6];
     // Callback only when the encoder value changes more than a threshold
-    if (m_pFingerController != nullptr)
-        if (abs(m_iEncoderPosition - callbackEncPos) > CALLBACK_ENC_THRESHOLD) {
-            (m_pFingerController->*m_callback)(m_iEncoderPosition * ENCODER_DIR);
-            callbackEncPos = m_iEncoderPosition;
-        }
+    if (abs(m_iEncoderPosition - callbackEncPos) > CALLBACK_ENC_THRESHOLD) {
+        if (m_pFingerController != nullptr)
+            (m_pFingerController->*m_pFingerCallback)(m_iEncoderPosition * ENCODER_DIR);
+        if (m_pBowController != nullptr)
+            (m_pBowController->*m_pBowCallback)(m_iEncoderPosition);
+
+        callbackEncPos = m_iEncoderPosition;
+    }
 
     m_bFault = (m_uiCurrentStatusWord & (1 << 3));
 
@@ -921,7 +938,6 @@ int Epos4::setRxMsg(can_message_t& msg) {
     }
     memcpy(&m_rxMsg, &msg, sizeof(can_message_t));
     m_bSDOBusy = false;
-    // LOG_LOG("sdoBusy: %i", m_bSDOBusy);
     return 0;
 }
 

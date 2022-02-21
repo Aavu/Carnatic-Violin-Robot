@@ -69,7 +69,7 @@ void Util::trimEndZeros(float* p, int& nPitches) {
 void Util::cleanUpData(float* p, int& length, float lpf_alpha) {
     interpolateGaps(p, length);
     zeroPhaseLPF(p, length, lpf_alpha);
-    trimEndZeros(p, length);
+    // trimEndZeros(p, length);
 }
 
 bool Util::checkFollowError(int32_t* p, int nPitches) {

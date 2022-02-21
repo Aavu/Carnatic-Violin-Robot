@@ -37,10 +37,12 @@
 */
 
 class FingerController;
+class BowController;
 
 class Epos4 {
 public:
-    Epos4(FingerController* controller = nullptr, void (FingerController::* callback)(int32_t) = nullptr);
+    Epos4(FingerController* pFingerController = nullptr, void (FingerController::* pFingerCallback)(int32_t) = nullptr, BowController* pBowController = nullptr, void (BowController::* pBowCallback)(int32_t) = nullptr);
+    Epos4(BowController* pBowController = nullptr, void (BowController::* pBowCallback)(int32_t) = nullptr);
     ~Epos4() = default;
 
     int init(int iNodeID = 1);
@@ -72,7 +74,8 @@ public:
     char* getOpModeString(OpMode mode) const;
 
     // Write
-    int setOpMode(OpMode opMode, uint8_t uiInterpolationTime = PDO_RATE, int8_t iInterpolationIndex = -3);
+    int setOpMode(OpMode opMode, uint8_t uiInterpolationTime = PDO_RATE, int8_t iInterpolationIndex = -3, HomingMethod homingMethod = CurrentThresholdPositive);
+
     int setControlWord(_WORD cw);
     int shutdown();
     int setEnable(bool bEnable = true);
@@ -84,6 +87,7 @@ public:
     int setFollowErrorWindow(_DWORD errWindow);
     int quickStop();
     int startHoming();
+    int SetHomePosition(int32_t iPos = 0);
 
     int setCurrentControlParameters();
     int setPositionControlParameters();
@@ -142,8 +146,11 @@ private:
 
     volatile bool m_bFault = false;
 
-    FingerController* m_pFingerController;
-    void (FingerController::* m_callback)(int32_t);
+    FingerController* m_pFingerController = nullptr;
+    void (FingerController::* m_pFingerCallback)(int32_t) = nullptr;
+
+    BowController* m_pBowController = nullptr;
+    void (BowController::* m_pBowCallback)(int32_t) = nullptr;
 
     // write
     // Interpolation time period

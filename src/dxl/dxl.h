@@ -17,7 +17,6 @@
 
 #define DXL_DEVICE_NAME "OpenCR_DXL_Port" // Dummy obj to maintain API function standard. No actual meaning
 #define DXL_BAUDRATE 57600
-#define DXL_ID 1 // Dynamixel ID: 1
 
 #define ADDR_TORQUE_ENABLE 64
 #define ADDR_LED 65
@@ -27,6 +26,7 @@
 #define ADDR_OPERATING_MODE 11
 #define ADDR_MOVING 122
 #define ADDR_PRESENT_POSITION 132
+#define ADDR_PROFILE_VELOCITY 112
 
 #define MINIMUM_POSITION_LIMIT 0    // Refer to the Minimum Position Limit of product eManual
 #define MAXIMUM_POSITION_LIMIT 4095 // Refer to the Maximum Position Limit of product eManual
@@ -35,7 +35,7 @@
 
 #define PROTOCOL_VERSION 2.0
 
-#define DXL_MOVING_STATUS_THRESHOLD 10 // DYNAMIXEL moving status threshold
+#define DXL_MOVING_STATUS_THRESHOLD 25 // DYNAMIXEL moving status threshold
 
 enum OperatingMode {
     CurrentControl = 0,
@@ -102,6 +102,7 @@ public:
     [[maybe_unused]] int operatingMode(OperatingMode mode);
 
     [[maybe_unused]] int setGoalCurrent(int16_t iCurrent);
+    int setProfileVelocity(uint16_t uiVelocity);
 
     [[maybe_unused]] int torque(bool bEnable = true);
 
