@@ -265,6 +265,10 @@ int BowController::prepareToPlay() {
     return 0;
 }
 
+int BowController::computeBowTrajectory(const int bowChanges[], int numChanges) {
+
+}
+
 int BowController::startBowing(float amplitude, BowDirection direction) {
     if (direction != None)
         m_CurrentDirection = direction;
@@ -281,12 +285,16 @@ int BowController::changeDirection() {
 }
 
 int BowController::enablePDO(bool bEnable) {
-    auto state = bEnable ? NMTState::Operational : NMTState::Stopped;
+    auto state = bEnable ? NMTState::Operational : NMTState::PreOperational;
     int err = m_epos.setNMTState(state);
     if (err != 0)
         LOG_ERROR("setNMTState");
     LOG_LOG("Bow PDO Enable = %i", bEnable);
     return err;
+}
+
+int BowController::setNMTState(NMTState nmtState) {
+    return m_epos.setNMTState(nmtState);
 }
 
 int BowController::setPosition(int32_t iPosition, bool bDirChange, bool bPDO) {
@@ -297,6 +305,10 @@ int BowController::setPosition(int32_t iPosition, bool bDirChange, bool bPDO) {
         return m_epos.PDO_setPosition(iPosition);
 
     return m_epos.moveToPosition(iPosition);
+}
+
+int BowController::updatePosition() {
+
 }
 
 int BowController::setVelocity(int32_t iVelocity, bool bPDO) {

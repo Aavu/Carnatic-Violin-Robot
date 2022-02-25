@@ -43,10 +43,10 @@ enum class StringPos {
 
 #define BOW_ENCODER_MIN 10000
 #define BOW_ENCODER_MAX 40000
-#define PROFILE_VELOCITY_PITCH 100
+#define PROFILE_VELOCITY_PITCH 200
 #define BOW_LIFT_MULTIPLIER 1.5 // Increase this number to increase bow lift towards the edges
 
-#define PITCH_MAX 176   // Away from strings
+#define PITCH_MAX 178 //176   // Away from strings
 #define PITCH_MIN 188   // Pressing the strings
 #define PITCH_AVG 183.5f
 

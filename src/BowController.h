@@ -37,6 +37,7 @@ public:
 
     int enable(bool bEnable = true);
     int prepareToPlay();
+    int computeBowTrajectory(const int bowChanges[], int numChanges);
 
     int startBowing(float amplitude = 0.5, BowDirection direction = None);
     int stopBowing();
@@ -44,7 +45,9 @@ public:
     int changeDirection();
 
     int enablePDO(bool bEnable = true);
+    int setNMTState(NMTState nmtState);
     int setPosition(int32_t iPosition, bool bDirChange = false, bool bPDO = true);
+    int updatePosition();
     int setVelocity(int32_t iVelocity, bool bPDO = true);
 
     int setRxMsg(can_message_t& msg);

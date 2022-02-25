@@ -116,13 +116,52 @@ void Util::convertPitchToInc(int32_t* inc, const float* p, int nPitches, int off
 
 }
 
+void Util::arange(int start, int end, int* array, int step) {
+    if (!array)
+        return;
+
+    int N = abs(end - start) / step;
+
+    for (int i = 0; i < N; ++i)
+        array[i] = start + (step * i);
+}
+
+void Util::linspace(float start, float end, int N, float* array) {
+    if (!array || N <= 0)
+        return;
+
+    for (int i = 0; i < N; ++i) {
+        array[i] = start + ((i * 1.f / (N - 1)) * (end - start));
+    }
+}
+
+void Util::interpWithBlend(float q0, float qf, int32_t N, float tb_cent, float* curve) {
+    if (!curve)
+        return;
+
+    int nb = int(tb_cent * N);
+    float a_2 = 0.5 * (qf - q0) / (nb * (N - nb));
+
+    for (int i = 0; i < nb; ++i) {
+        curve[i] = q0 + a_2 * pow(i, 2);
+    }
+
+    for (int i = N - nb; i < N; ++i) {
+        curve[N - nb - i - 1] = qf - a_2 * pow(i, 2);
+    }
+
+    float tmp = a_2 * pow(nb + 1, 2);
+    float qa = q0 + tmp;
+    float qb = qf - tmp;
+    linspace(qa, qb, N - (2 * nb), &curve[nb]);
+}
+
 void Util::thirdOrderPolyFit(int t1, float y, float* arr) {
     int y3 = 3 * y;
     int y2 = 2 * y;
-    Serial.println(y);
+    // Serial.println(y);
     for (int i = 0; i < t1; ++i) {
         float t = 1.f * i / t1;
         arr[i] = (y3 * (powf(t, 2))) - (y2 * (powf(t, 3)));
-        // Serial.println(arr[i]);
     }
 }

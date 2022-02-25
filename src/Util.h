@@ -21,6 +21,11 @@ namespace Util {
     void thirdOrderPolyFit(int t1, float y, float* arr);
     void convertPitchToInc(int32_t* inc, const float* p, int nPitches, int offset = 0);
 
+    void arange(int start, int end, int* array = nullptr, int step = 1);
+    void linspace(float start, float end, int N, float* array = nullptr);
+
+    // refer: https://cs.gmu.edu/~kosecka/cs685/cs685-trajectories.pdf
+    void interpWithBlend(float q0, float qf, int32_t N, float tb_cent = 0.1, float* curve = nullptr);
 } // namespace Util
 
 #endif // UTIL_H
