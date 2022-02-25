@@ -78,7 +78,7 @@ int Hathaani::perform(const performParam_t& param, float lpf_alpha, bool shouldB
     int err;
 
     if (shouldBow)
-        err = m_pBowController->prepareToPlay();
+        err = m_pBowController->prepareToPlay(param.bowChanges, param.nBowChanges, param.length);
 
     // Shallow copy
     m_performParam = param;
@@ -143,7 +143,7 @@ cleanup:
 
 int Hathaani::bowTest(const performParam_t& param) {
     int err;
-    err = m_pBowController->prepareToPlay();
+    err = m_pBowController->prepareToPlay(param.bowChanges, param.nBowChanges, param.length);
     m_performParam = param;
     m_bPlaying = true;
     RPDOTimer.start();
@@ -154,7 +154,7 @@ int Hathaani::bowTest(const performParam_t& param) {
     }
 
     m_pBowController->enablePDO(false);
-    pInstance->RPDOTimer.stop();
+    RPDOTimer.stop();
 
     return err;
 }
@@ -163,15 +163,19 @@ void Hathaani::RPDOTimerIRQHandler() {
     static int32_t lastPos = 0;
     performParam_t& param = pInstance->m_performParam;
     int kTotalLength = param.length;
-    int32_t pos = BOW_ENCODER_MIN + param.bowTraj[i] * (BOW_ENCODER_MAX - BOW_ENCODER_MIN);
+    // int32_t pos = BOW_ENCODER_MIN + param.bowTraj[i] * (BOW_ENCODER_MAX - BOW_ENCODER_MIN);
+    pInstance->m_pBowController->updatePosition(i);
     ++i;
-    pInstance->m_pBowController->setPosition(pos, false, true);
-    if (i < kTotalLength) {
-        lastPos = pos;
-    } else {
+    // pInstance->m_pBowController->setPosition(pos, false, true);
+    if (i >= kTotalLength) {
         pInstance->m_bPlaying = false;
-        i = kTotalLength - 1;
     }
+    // if (i < kTotalLength) {
+    //     lastPos = pos;
+    // } else {
+    //     pInstance->m_bPlaying = false;
+    //     i = kTotalLength - 1;
+    // }
 }
 
 // void Hathaani::RPDOTimerIRQHandler() {

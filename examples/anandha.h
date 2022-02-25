@@ -734,7 +734,8 @@ namespace phrase {
 
         };
 
-        int nBowChanges = 2;
+        int bowChanges[] = { 73, 141, 300 };
+        int nBowChanges = 3;
 
         float amplitude[] = {
                 0.01,

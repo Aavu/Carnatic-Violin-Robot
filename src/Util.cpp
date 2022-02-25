@@ -141,16 +141,22 @@ void Util::interpWithBlend(float q0, float qf, int32_t N, float tb_cent, float* 
 
     int nb = int(tb_cent * N);
     float a_2 = 0.5 * (qf - q0) / (nb * (N - nb));
+    float tmp;
 
     for (int i = 0; i < nb; ++i) {
-        curve[i] = q0 + a_2 * pow(i, 2);
+        tmp = a_2 * pow(i, 2);
+        curve[i] = q0 + tmp;
+        //  N-1, N-2, ... , N - nb
+        curve[N - i - 1] = qf - tmp;
     }
 
-    for (int i = N - nb; i < N; ++i) {
-        curve[N - nb - i - 1] = qf - a_2 * pow(i, 2);
-    }
+    // Serial.print(q0);
+    // Serial.print(" ");
+    // Serial.print(qf);
+    // Serial.print(" ");
+    // Serial.println(a_2 * 2.0, 10);
 
-    float tmp = a_2 * pow(nb + 1, 2);
+    tmp = a_2 * pow(nb, 2);
     float qa = q0 + tmp;
     float qb = qf - tmp;
     linspace(qa, qb, N - (2 * nb), &curve[nb]);

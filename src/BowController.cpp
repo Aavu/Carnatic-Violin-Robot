@@ -72,7 +72,8 @@ int BowController::init(bool shouldHome) {
 
 int BowController::reset() {
     if (!m_bInitialized) return 0;
-
+    delete[] m_afBowTrajectory;
+    m_afBowTrajectory = nullptr;
     enablePDO(false);
     enable(false);
 
@@ -182,7 +183,7 @@ int BowController::enable(bool bEnable) {
     return 0;
 }
 
-int BowController::prepareToPlay() {
+int BowController::prepareToPlay(const int bowChanges[], int numChanges, int nPitches) {
     int err;
 
     err = m_epos.setOpMode(ProfilePosition);
@@ -261,12 +262,65 @@ int BowController::prepareToPlay() {
     //     LOG_ERROR("moveToPosition");
     //     return err;
     // }
+
+    computeBowTrajectory(bowChanges, numChanges, nPitches);
     m_dxlTimer.start();
     return 0;
 }
 
-int BowController::computeBowTrajectory(const int bowChanges[], int numChanges) {
+int BowController::computeBowTrajectory(const int bowChanges[], int numChanges, int nPitches) {
+    bool dir = true;    // start with down bow
+    m_iNPitches = nPitches;
+    static const int MAX = 1;
+    static const int MIN = 0;
+    float p0 = dir ? MIN : MAX;
+    float pf = dir ? MAX : MIN;;
+    const int kBowEncLen = MAX - MIN;
 
+    delete[] m_afBowTrajectory;
+    m_afBowTrajectory = new float[m_iNPitches];
+
+    if (numChanges <= 0) {
+        // Compute just a single trajectory
+        Util::interpWithBlend(p0, pf, nPitches, 0.1, m_afBowTrajectory);
+        return 0;
+    }
+
+    const int kNumSegments = numChanges + 1;
+    std::pair<int, int> segments[kNumSegments];
+
+    segments[0] = std::pair<int, int>(0, bowChanges[0]);
+    for (int i = 0; i < numChanges - 1; ++i) {
+        segments[i + 1] = std::pair<int, int>(bowChanges[i], bowChanges[i + 1]);
+    }
+    segments[kNumSegments - 1] = std::pair<int, int>(bowChanges[numChanges - 1], nPitches);
+
+    for (int i = 0; i < kNumSegments; ++i) {
+        int iSegLen = segments[i].second - segments[i].first;
+        float iBowLen = MAX_BOW_VELOCITY * iSegLen * kBowEncLen;
+        if (iBowLen < kBowEncLen) {  // This means full bowing would be faster than max velocity -> restrict length
+            pf = p0 + (dir ? iBowLen : -iBowLen);
+        } else { // -> Use full bow
+            pf = dir ? MAX : MIN;
+        }
+        Serial.print("(");
+        Serial.print(segments[i].first);
+        Serial.print(", ");
+        Serial.print(segments[i].second);
+        Serial.print(")\t");
+        Serial.print(iBowLen);
+        Serial.print(" ");
+        Serial.print(dir);
+        Serial.print(" ");
+        Serial.print(p0);
+        Serial.print(" ");
+        Serial.println(pf);
+        Util::interpWithBlend(p0, pf, iSegLen, 0.05, &m_afBowTrajectory[segments[i].first]);
+        dir ^= 1;
+        p0 = pf;
+    }
+
+    return 0;
 }
 
 int BowController::startBowing(float amplitude, BowDirection direction) {
@@ -307,8 +361,18 @@ int BowController::setPosition(int32_t iPosition, bool bDirChange, bool bPDO) {
     return m_epos.moveToPosition(iPosition);
 }
 
-int BowController::updatePosition() {
+int BowController::updatePosition(int i) {
+    if (!m_afBowTrajectory)
+        return 1;
 
+    float val = m_afBowTrajectory[std::min(i, m_iNPitches - 1)];
+    int32_t tmp = BOW_ENCODER_MIN + val * (BOW_ENCODER_MAX - BOW_ENCODER_MIN);
+    // Serial.print((int) std::min(i, m_iNPitches - 1));
+    // Serial.print(" ");
+    // Serial.print(val);
+    // Serial.print(" ");
+    // Serial.println((int) tmp);
+    return setPosition(tmp);
 }
 
 int BowController::setVelocity(int32_t iVelocity, bool bPDO) {

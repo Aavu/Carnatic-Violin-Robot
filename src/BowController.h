@@ -8,6 +8,7 @@
 #include "logger.h"
 #include "epos4/epos4.h"
 #include "dxl/dxl.h"
+#include "Util.h"
 
 class BowController {
 public:
@@ -36,8 +37,7 @@ public:
     int setHome();
 
     int enable(bool bEnable = true);
-    int prepareToPlay();
-    int computeBowTrajectory(const int bowChanges[], int numChanges);
+    int prepareToPlay(const int bowChanges[], int numChanges, int nPitches);
 
     int startBowing(float amplitude = 0.5, BowDirection direction = None);
     int stopBowing();
@@ -47,7 +47,7 @@ public:
     int enablePDO(bool bEnable = true);
     int setNMTState(NMTState nmtState);
     int setPosition(int32_t iPosition, bool bDirChange = false, bool bPDO = true);
-    int updatePosition();
+    int updatePosition(int i);
     int setVelocity(int32_t iVelocity, bool bPDO = true);
 
     int setRxMsg(can_message_t& msg);
@@ -59,6 +59,9 @@ private:
     PortHandler* m_pPortHandler;
     BowState m_bowingState;
     BowDirection m_CurrentDirection = Down;
+
+    float* m_afBowTrajectory = nullptr;
+    int m_iNPitches = 0;
 
     Epos4 m_epos;
     volatile int32_t m_iCurrentPosition = 0;
@@ -72,6 +75,7 @@ private:
 
     static BowController* pInstance;
 
+    int computeBowTrajectory(const int bowChanges[], int numChanges, int nPitches);
     void encoderPositionCallback(int32_t encPos);
     static void dxlUpdateCallback();
 };

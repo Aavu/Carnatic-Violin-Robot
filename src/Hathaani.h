@@ -14,6 +14,7 @@ struct performParam_t {
     int32_t* positions;
     int length;
     float* bowTraj;
+    int* bowChanges;
     int nBowChanges;
     float* amplitude;
     float volume = 1.0;

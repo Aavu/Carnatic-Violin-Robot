@@ -33,7 +33,6 @@ enum class DxlID {
 };
 
 // string
-
 enum class StringPos {
     E = 72,
     A = 90,
@@ -41,10 +40,11 @@ enum class StringPos {
     G = 120
 };
 
+#define MAX_BOW_VELOCITY 0.005 // %/sec
 #define BOW_ENCODER_MIN 10000
 #define BOW_ENCODER_MAX 40000
-#define PROFILE_VELOCITY_PITCH 200
-#define BOW_LIFT_MULTIPLIER 1.5 // Increase this number to increase bow lift towards the edges
+#define PROFILE_VELOCITY_PITCH 400
+#define BOW_LIFT_MULTIPLIER 1.6 // Increase this number to increase bow lift towards the edges
 
 #define PITCH_MAX 178 //176   // Away from strings
 #define PITCH_MIN 188   // Pressing the strings

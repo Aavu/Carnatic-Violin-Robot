@@ -7,6 +7,7 @@ Hathaani* pHathaani;
 
 int getch() {
     while (1) {
+        delay(10);
         if (Serial.available() > 0) {
             break;
         }
@@ -24,6 +25,7 @@ void setup() {
     param.pitches = phrase::pitch;
     param.length = phrase::nPitches;
     param.bowTraj = phrase::bow;
+    param.bowChanges = phrase::bowChanges;
     param.nBowChanges = phrase::nBowChanges;
     param.amplitude = phrase::amplitude;
     param.volume = 0.5;

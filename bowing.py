@@ -24,7 +24,9 @@ def test(q0, qf, N, tb=0.1):
      
     for i in range(N-nb, N):
         _curve[N - nb - i - 1] = qf - 0.5*a*((i - N + nb)**2)
+        print(qf - 0.5*a*((i - N + nb)**2))
 
+    print(q0, qf, a)
     qa = q0 + 0.5*a*(nb**2)
     qb = qf - 0.5*a*(nb**2)
     # _curve[nb:N-nb] = np.linspace(qa, qb, N - (2*nb))
@@ -35,10 +37,10 @@ def test(q0, qf, N, tb=0.1):
     return _curve
 
 
-bow_change = [73, 141, 300]
+bow_change = [73, 141]
 n_pitches = 723
-BOW_ENCODER_MIN = 0 # 8000
-BOW_ENCODER_MAX = 1 # 40000
+BOW_ENCODER_MIN = 10000
+BOW_ENCODER_MAX = 40000
 
 MAX_VELOCITY = 0.008 # %/sec
 
@@ -56,27 +58,28 @@ bow = np.zeros(n_pitches)
 p0 = BOW_ENCODER_MIN if (dir) else BOW_ENCODER_MAX
 
 ### Eval ###
-# pf = BOW_ENCODER_MAX if dir else BOW_ENCODER_MIN
-# seg_len = 100
+pf = BOW_ENCODER_MAX if dir else BOW_ENCODER_MIN
+seg_len = 100
 # curve = linear_interp(p0, pf, seg_len, 0.1)
-# curve1 = test(0, 1, seg_len, 0.1)
+curve1 = test(0, 1, seg_len, 0.1)
+print(np.round(curve1, 2))
 # print(np.mean(np.square(curve - curve1)))
 # plt.plot(curve)
-# plt.plot(curve1)
-# plt.show()
-# exit()
+plt.plot(curve1)
+plt.show()
+exit()
 
 # BOW_ENCODER_MAX = BOW_ENCODER_MIN + (vel * seg_len)
 for i in range(num_segments):
     seg = (int(t_seg[i, 0]), int(t_seg[i, 1]))
     seg_len = seg[1] - seg[0]
-    bow_len = MAX_VELOCITY * seg_len
-    if bow_len < 1: # faster than max velocity
+    bow_len = MAX_VELOCITY * seg_len * (BOW_ENCODER_MAX - BOW_ENCODER_MIN)
+    if bow_len < (BOW_ENCODER_MAX - BOW_ENCODER_MIN): # faster than max velocity
         pf = p0 + bow_len if dir else p0 - bow_len
     else:
         pf = BOW_ENCODER_MAX if dir else BOW_ENCODER_MIN
     
-    print(bow_len, p0, pf)
+    print(seg, bow_len, p0, pf)
     # t = np.arange(seg_len) / seg_len
     # a = [p0, 3*(pf-p0), 2*(pf - p0)]
 
@@ -100,6 +103,6 @@ for i in range(num_segments):
     p0 = pf
 
 # bow = np.round(bow).astype(int)
-np.savetxt("bow.txt", [bow], delimiter=",")
-# plt.plot(bow)
-# plt.show()
+# np.savetxt("bow.txt", [bow], delimiter=",")
+plt.plot(bow)
+plt.show()
