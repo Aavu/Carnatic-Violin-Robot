@@ -324,9 +324,9 @@ int BowController::computeBowTrajectory(const int bowChanges[], int numChanges, 
 }
 
 int BowController::startBowing(float amplitude, BowDirection direction) {
-    if (direction != None)
+    if (direction != BowDirection::None)
         m_CurrentDirection = direction;
-    return m_epos.moveWithVelocity(100 * m_CurrentDirection);
+    return m_epos.moveWithVelocity(100 * (int) m_CurrentDirection);
 }
 
 int BowController::stopBowing() {
@@ -334,7 +334,10 @@ int BowController::stopBowing() {
 }
 
 int BowController::changeDirection() {
-    m_CurrentDirection = Down ? Up : Down;
+    if (m_CurrentDirection == BowDirection::Down)
+        m_CurrentDirection = BowDirection::Up;
+    else if (m_CurrentDirection == BowDirection::Up)
+        m_CurrentDirection = BowDirection::Down;
     LOG_LOG("Direction changed");
 }
 

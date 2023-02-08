@@ -50,9 +50,6 @@ int Hathaani::init(bool shouldHome) {
     RPDOTimer.setPeriod(PDO_RATE * 1000);
     RPDOTimer.attachInterrupt(RPDOTimerIRQHandler);
 
-    // test dummy
-    return 0;
-
     return m_pFingerController->init(shouldHome);
 }
 
@@ -170,12 +167,14 @@ void Hathaani::RPDOTimerIRQHandler() {
     if (i >= kTotalLength) {
         pInstance->m_bPlaying = false;
     }
-    // if (i < kTotalLength) {
-    //     lastPos = pos;
-    // } else {
-    //     pInstance->m_bPlaying = false;
-    //     i = kTotalLength - 1;
-    // }
+
+    if (i < kTotalLength) {
+        pInstance->m_pFingerController->moveToPosition(param.positions[i]);
+    } else {
+        pInstance->m_pFingerController->moveToPosition(param.positions[i - 1]);
+        pInstance->m_bPlaying = false;
+        i = kTotalLength - 1;
+    }
 }
 
 // void Hathaani::RPDOTimerIRQHandler() {

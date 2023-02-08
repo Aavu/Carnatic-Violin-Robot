@@ -142,8 +142,6 @@ private:
     bool m_bCANTxReady = false;
     bool m_bIsPDO = false;
 
-    can_message_t m_CANMsgBuf[CAN_MSG_BUF_LEN];
-
     volatile bool m_bFault = false;
 
     FingerController* m_pFingerController = nullptr;

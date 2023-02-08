@@ -12,13 +12,13 @@
 
 class BowController {
 public:
-    enum BowDirection {
-        None = 0,
-        Down = 1,
-        Up = -1
+    enum class BowDirection {
+        None = -1,
+        Up = 0,
+        Down = 1
     };
 
-    enum BowState {
+    enum class BowState {
         Stopped = 0,
         Bowing = 1
     };
@@ -39,7 +39,7 @@ public:
     int enable(bool bEnable = true);
     int prepareToPlay(const int bowChanges[], int numChanges, int nPitches);
 
-    int startBowing(float amplitude = 0.5, BowDirection direction = None);
+    int startBowing(float amplitude = 0.5, BowDirection direction = BowDirection::None);
     int stopBowing();
 
     int changeDirection();
@@ -58,7 +58,7 @@ private:
     bool m_bInitialized = false;
     PortHandler* m_pPortHandler;
     BowState m_bowingState;
-    BowDirection m_CurrentDirection = Down;
+    BowDirection m_CurrentDirection = BowDirection::Down;
 
     float* m_afBowTrajectory = nullptr;
     int m_iNPitches = 0;

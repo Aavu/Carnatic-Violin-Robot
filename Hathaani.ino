@@ -30,6 +30,7 @@ void setup() {
     param.amplitude = phrase::amplitude;
     param.volume = 0.5;
 
+    // err = pHathaani->perform(param, 0.5, true);
     err = pHathaani->bowTest(param);
 
     while (1) {

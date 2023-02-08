@@ -6,7 +6,6 @@
 
 // CANbus
 #define PDO_RATE 6 // ms
-#define CAN_MSG_BUF_LEN 16
 
 // Epos4
 #define FINGER_NODE_ID 1
@@ -40,19 +39,19 @@ enum class StringPos {
     G = 120
 };
 
-#define MAX_BOW_VELOCITY 0.005 // %/sec
-#define BOW_ENCODER_MIN 10000
+#define MAX_BOW_VELOCITY 0.006 // %/sec
+#define BOW_ENCODER_MIN 8000
 #define BOW_ENCODER_MAX 40000
 #define PROFILE_VELOCITY_PITCH 400
 #define BOW_LIFT_MULTIPLIER 1.6 // Increase this number to increase bow lift towards the edges
 
-#define PITCH_MAX 178 //176   // Away from strings
+#define PITCH_MAX 176   // Away from strings
 #define PITCH_MIN 188   // Pressing the strings
-#define PITCH_AVG 183.5f
+#define PITCH_AVG 184.f
 
 #define ROLL_MAX 100    // Near bridge
 #define ROLL_MIN 142    // Near Fingerboard
-#define ROLL_AVG 120
+#define ROLL_AVG 115
 
 enum class YawPos {  // Angles in degrees
     Mid = 2048,
