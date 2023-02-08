@@ -45,7 +45,7 @@ public:
     Epos4(BowController* pBowController = nullptr, void (BowController::* pBowCallback)(int32_t) = nullptr);
     ~Epos4() = default;
 
-    int init(int iNodeID = 1);
+    int init(int iNodeID = 1, bool inverted = false);
     void reset();
 
     int configEC45();
@@ -124,6 +124,7 @@ public:
 
 private:
     uint8_t m_uiNodeID = 1;
+    int m_iDirMultiplier = 1;
     _DWORD m_uiError;    ///< EPOS global error status
     _WORD m_uiDevError;     // Device error
 

@@ -1,3 +1,7 @@
+//
+// Created by Raghavasimhan Sankaranarayanan on 11/01/22.
+//
+
 #include "BowController.h"
 
 BowController* BowController::pInstance = nullptr;
@@ -5,9 +9,11 @@ BowController* BowController::pInstance = nullptr;
 BowController::BowController(PortHandler& portHandler)
     : m_pPortHandler(&portHandler),
     m_epos(this, &BowController::encoderPositionCallback),
-    m_pitchDxl(DxlID::Pitch, *m_pPortHandler, *PortHandler::getPacketHandler()),
-    m_rollDxl(DxlID::Roll, *m_pPortHandler, *PortHandler::getPacketHandler()),
-    m_yawDxl(DxlID::Yaw, *m_pPortHandler, *PortHandler::getPacketHandler()), m_dxlTimer(TIMER_CH3) {}
+    m_leftDxl(DxlID::Left, *m_pPortHandler, *PortHandler::getPacketHandler(), DXL_LEFT_ZERO),
+    m_rightDxl(DxlID::Right, *m_pPortHandler, *PortHandler::getPacketHandler(), DXL_RIGHT_ZERO),
+    m_slideDxl(DxlID::Slide, *m_pPortHandler, *PortHandler::getPacketHandler()), 
+    m_dxlTimer(TIMER_CH3) 
+{}
 
 BowController::~BowController() {
     reset();
@@ -23,27 +29,27 @@ void BowController::destroy(BowController* pInstance) {
 }
 
 int BowController::init(bool shouldHome) {
-    int err = m_epos.init(BOW_NODE_ID);
+    int err = m_epos.init(BOW_NODE_ID, BOW_ENCODER_DIRECTION);
     if (err != 0) {
         LOG_ERROR("Bow Controller Init");
         return err;
     }
 
-    err = m_pitchDxl.operatingMode(PositionControl);
+    err = m_leftDxl.operatingMode(ExtendedPositionControl);
     if (err != 0) {
-        LOG_ERROR("Bow pitch Set Operation Mode");
+        LOG_ERROR("Left Dxl Set Operation Mode");
         return err;
     }
 
-    err = m_rollDxl.operatingMode(PositionControl);
+    err = m_rightDxl.operatingMode(ExtendedPositionControl);
     if (err != 0) {
-        LOG_ERROR("Bow roll Set Operation Mode");
+        LOG_ERROR("Right Dxl Set Operation Mode");
         return err;
     }
 
-    err = m_yawDxl.operatingMode(PositionControl);
+    err = m_slideDxl.operatingMode(ExtendedPositionControl);
     if (err != 0) {
-        LOG_ERROR("Bow yew Set Operation Mode");
+        LOG_ERROR("Slide Dxl Set Operation Mode");
         return err;
     }
 
@@ -74,6 +80,16 @@ int BowController::reset() {
     if (!m_bInitialized) return 0;
     delete[] m_afBowTrajectory;
     m_afBowTrajectory = nullptr;
+
+    delete[] m_aiStringId;
+    m_aiStringId = nullptr;
+
+    int err = moveBowToPosition(5, 0, false, true);
+    if (err != 0) {
+        LOG_ERROR("dxl move to position");
+        return err;
+    }
+
     enablePDO(false);
     enable(false);
 
@@ -92,7 +108,7 @@ int BowController::setHome() {
         return 1;
     }
 
-    err = m_epos.setHomingMethod(CurrentThresholdNegative);
+    err = m_epos.setHomingMethod(CurrentThresholdPositive);
     if (err != 0) {
         LOG_ERROR("setHomingMethod");
         return 1;
@@ -104,21 +120,15 @@ int BowController::setHome() {
         return 1;
     }
 
-    err = m_pitchDxl.moveToPosition((float) PITCH_MAX, false);
+    err = moveBowToPosition(5, 0, true, true);
     if (err != 0) {
-        LOG_ERROR("pitch dxl move to position");
+        LOG_ERROR("dxl pair move to position");
         return err;
     }
 
-    err = m_yawDxl.moveToPosition((int32_t) YawPos::Mid, false);
+    err = m_slideDxl.moveToPosition((int32_t) SLIDE_AVG);
     if (err != 0) {
-        LOG_ERROR("yaw dxl move to position");
-        return err;
-    }
-
-    err = m_rollDxl.moveToPosition((float) ROLL_AVG, false);
-    if (err != 0) {
-        LOG_ERROR("roll dxl move to position");
+        LOG_ERROR("slide dxl move to position");
         return err;
     }
 
@@ -150,6 +160,41 @@ int BowController::setHome() {
     return 0;
 }
 
+int BowController::moveBowToPosition(float fPos, float fAngle, bool isRadian, bool shouldWait) {
+    if (!isRadian) {
+        fAngle *= ((float) M_PI) / 180.f;
+    }
+
+    if (abs(fAngle) > ((float)M_PI)/4.f) { 
+        LOG_ERROR("Angle out of limit");
+        return 1; 
+    }
+
+    m_fAngle = fAngle;
+
+    float L = BOW_CENTER_EDGE_RAIL_DISTANCE;
+    float d = BOW_GEAR_PITCH_DIA;
+    float phi = (L/d) * tanf(m_fAngle);
+
+    float eta = fPos / d;
+
+    // Serial.print("Angles: ");
+    // Serial.print(L/d);
+    // Serial.print("\t");
+    // Serial.print(m_fAngle * 180.f / M_PI);
+    // Serial.print("\t");
+    // Serial.print(phi * 180.f / M_PI);
+    // Serial.print("\t");
+    // Serial.println(eta * 180 / M_PI);
+    int err = m_leftDxl.moveToPosition(phi - eta, false, true);
+    if (err != 0) {
+        LOG_ERROR("left dxl move failed...");
+        return err;
+    }
+
+    return m_rightDxl.moveToPosition(phi + eta, shouldWait, true);  // Same sign for phi because of the nature of the design, rotations are inverted
+}
+
 int BowController::enable(bool bEnable) {
     int err = m_epos.setEnable(bEnable);
     if (err != 0) {
@@ -163,19 +208,19 @@ int BowController::enable(bool bEnable) {
         LOG_ERROR("Reset (bow): readStatusWord");
     LOG_LOG("Status (%i): %h", BOW_NODE_ID, stat);
 
-    err = m_pitchDxl.torque(bEnable);
+    err = m_leftDxl.torque(bEnable);
     if (err != 0) {
-        LOG_ERROR("pitch torque");
+        LOG_ERROR("left torque");
         return err;
     }
-    err = m_rollDxl.torque(bEnable);
+    err = m_rightDxl.torque(bEnable);
     if (err != 0) {
-        LOG_ERROR("roll torque");
+        LOG_ERROR("right torque");
         return err;
     }
-    err = m_yawDxl.torque(bEnable);
+    err = m_slideDxl.torque(bEnable);
     if (err != 0) {
-        LOG_ERROR("yaw torque");
+        LOG_ERROR("slide torque");
         return err;
     }
 
@@ -183,7 +228,7 @@ int BowController::enable(bool bEnable) {
     return 0;
 }
 
-int BowController::prepareToPlay(const int bowChanges[], int numChanges, int nPitches) {
+int BowController::prepareToPlay(const int bowChanges[], int numChanges, int nPitches, int stringId[]) {
     int err;
 
     err = m_epos.setOpMode(ProfilePosition);
@@ -214,54 +259,28 @@ int BowController::prepareToPlay(const int bowChanges[], int numChanges, int nPi
         return err;
     }
 
-    // err = m_epos.setProfile(200, 10000);
-    // if (err != 0) {
-    //     LOG_ERROR("setProfile");
-    //     return err;
-    // }
-
     err = enable();
     if (err != 0) {
         LOG_ERROR("enable");
         return err;
     }
 
-    err = m_pitchDxl.setProfileVelocity(PROFILE_VELOCITY_PITCH);
+    err = moveBowToPosition(5, 0, false, true);
     if (err != 0) {
-        LOG_ERROR("pitch dxl setProfileVelocity");
+        LOG_ERROR("dxl move to position");
         return err;
     }
 
-    // Dummy test -- Change to PITCH_AVG later
-    err = m_pitchDxl.moveToPosition((float) PITCH_AVG, false);
+    err = m_slideDxl.moveToPosition((int32_t) SLIDE_AVG, true);
     if (err != 0) {
-        LOG_ERROR("pitch dxl move to position");
+        LOG_ERROR("slide dxl move to position");
         return err;
     }
 
-    err = m_yawDxl.moveToPosition((int32_t) YawPos::D, false);
-    if (err != 0) {
-        LOG_ERROR("yaw dxl move to position");
-        return err;
-    }
+    delete[] m_aiStringId;
+    m_aiStringId = new int[nPitches];
 
-    err = m_rollDxl.moveToPosition((float) ROLL_AVG, false);
-    if (err != 0) {
-        LOG_ERROR("roll dxl move to position");
-        return err;
-    }
-
-    // err = m_epos.moveToPosition(BOW_ENCODER_MAX);
-    // if (err != 0) {
-    //     LOG_ERROR("moveToPosition");
-    //     return err;
-    // }
-    // // delay(1000);
-    // err = m_epos.moveToPosition(BOW_ENCODER_MIN);
-    // if (err != 0) {
-    //     LOG_ERROR("moveToPosition");
-    //     return err;
-    // }
+    memcpy(m_aiStringId, stringId, nPitches * sizeof(int));
 
     computeBowTrajectory(bowChanges, numChanges, nPitches);
     m_dxlTimer.start();
@@ -323,16 +342,6 @@ int BowController::computeBowTrajectory(const int bowChanges[], int numChanges, 
     return 0;
 }
 
-int BowController::startBowing(float amplitude, BowDirection direction) {
-    if (direction != BowDirection::None)
-        m_CurrentDirection = direction;
-    return m_epos.moveWithVelocity(100 * (int) m_CurrentDirection);
-}
-
-int BowController::stopBowing() {
-    return m_epos.quickStop();
-}
-
 int BowController::changeDirection() {
     if (m_CurrentDirection == BowDirection::Down)
         m_CurrentDirection = BowDirection::Up;
@@ -360,37 +369,20 @@ int BowController::setPosition(int32_t iPosition, bool bDirChange, bool bPDO) {
 
     if (bPDO)
         return m_epos.PDO_setPosition(iPosition);
-
     return m_epos.moveToPosition(iPosition);
 }
 
 int BowController::updatePosition(int i) {
-    if (!m_afBowTrajectory)
+    if (!m_afBowTrajectory || !m_aiStringId)
         return 1;
+    
+    int idx = (i < m_iNPitches - 1) ? i : m_iNPitches - 1;
+    m_iCurrentTrajIdx = idx;
 
-    float val = m_afBowTrajectory[std::min(i, m_iNPitches - 1)];
+    float val = m_afBowTrajectory[idx];
     int32_t tmp = BOW_ENCODER_MIN + val * (BOW_ENCODER_MAX - BOW_ENCODER_MIN);
-    // Serial.print((int) std::min(i, m_iNPitches - 1));
-    // Serial.print(" ");
-    // Serial.print(val);
-    // Serial.print(" ");
-    // Serial.println((int) tmp);
+    // LOG_LOG("Position: %i", int(tmp));
     return setPosition(tmp);
-}
-
-int BowController::setVelocity(int32_t iVelocity, bool bPDO) {
-    static int32_t prevVel = 0;
-
-    if (abs(prevVel - iVelocity) > 5) {
-        m_pitchDxl.moveToPosition(m_fPitch, false);
-        prevVel - iVelocity;
-    }
-
-    if (bPDO)
-        return m_epos.PDO_setVelocity(iVelocity);
-
-
-    return m_epos.moveWithVelocity(iVelocity);
 }
 
 int BowController::setRxMsg(can_message_t& msg) {
@@ -407,17 +399,24 @@ void BowController::handleEMCYMsg(can_message_t& msg) {
 
 void BowController::encoderPositionCallback(int32_t encPos) {
     m_iCurrentPosition = encPos;
-    // LOG_LOG("Position: %i", encPos);
-    float C = 2000 + BOW_ENCODER_MIN + (BOW_ENCODER_MAX - BOW_ENCODER_MIN) / 2;
-    encPos -= C;
-    float corr = encPos * 1.0 / std::max((BOW_ENCODER_MAX - C), (BOW_ENCODER_MIN - C));
-    corr = -pow(corr, 2) * BOW_LIFT_MULTIPLIER;
-    m_fPitch = PITCH_AVG + corr;
-    // Serial.print(m_fPitch);
-    // Serial.print("\t");
-    // Serial.println(corr);
+    // float C = 2000 + BOW_ENCODER_MIN + (BOW_ENCODER_MAX - BOW_ENCODER_MIN) / 2;
+    // encPos -= C;
+    // float corr = encPos * 1.0 / std::max((BOW_ENCODER_MAX - C), (BOW_ENCODER_MIN - C));
+    // corr = -pow(corr, 2) * BOW_LIFT_MULTIPLIER;
+    // m_fPitch = PITCH_AVG + corr;
 }
 
 void BowController::dxlUpdateCallback() {
-    pInstance->m_pitchDxl.moveToPosition(pInstance->m_fPitch, false);
+    static int lastString = -1;
+    int idx = pInstance->m_iCurrentTrajIdx;
+    // pInstance->m_pitchDxl.moveToPosition(pInstance->m_fPitch, false);
+    if (lastString != pInstance->m_aiStringId[idx]) {
+        if (pInstance->m_aiStringId[idx] == 0) {
+            pInstance->moveBowToPosition(10, -40);
+            lastString = pInstance->m_aiStringId[idx];
+        } else if (pInstance->m_aiStringId[idx] == 1) {
+            pInstance->moveBowToPosition(-2, -20);
+            lastString = pInstance->m_aiStringId[idx];
+        }
+    }
 }

@@ -96,7 +96,7 @@ private:
 
 class Dynamixel {
 public:
-    Dynamixel(DxlID id, PortHandler& portHandler, dynamixel::PacketHandler& packetHandler);
+    Dynamixel(DxlID id, PortHandler& portHandler, dynamixel::PacketHandler& packetHandler, int32_t zeroPosition = 0);
     ~Dynamixel();
 
     [[maybe_unused]] int operatingMode(OperatingMode mode);
@@ -125,5 +125,6 @@ private:
     int m_id;
     dynamixel::PacketHandler* m_pPacketHandler;
     dynamixel::PortHandler* m_pPortHandler;
+    int32_t m_iZero;
     bool m_bIsEnabled;
 };

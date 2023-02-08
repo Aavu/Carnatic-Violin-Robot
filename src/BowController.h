@@ -1,14 +1,14 @@
 //
-// Created by Raghavasimhan Sankaranarayanan on 01/20/22.
-// 
+// Created by Raghavasimhan Sankaranarayanan on 11/01/22.
+//
 
-#pragma once
+#ifndef BOWCONTROLLER_H
+#define BOWCONTROLLER_H
 
-#include "def.h"
-#include "logger.h"
-#include "epos4/epos4.h"
 #include "dxl/dxl.h"
-#include "Util.h"
+#include "epos4/epos4.h"
+#include "util.h"
+#include "def.h"
 
 class BowController {
 public:
@@ -36,11 +36,13 @@ public:
 
     int setHome();
 
-    int enable(bool bEnable = true);
-    int prepareToPlay(const int bowChanges[], int numChanges, int nPitches);
+    /* position is wrt the top most point in Z Axis (away from the strings) the bow can go.
+     * Angle is given in radians
+     */
+    int moveBowToPosition(float fPos, float fAngle, bool isRadian = false, bool shouldWait = false);
 
-    int startBowing(float amplitude = 0.5, BowDirection direction = BowDirection::None);
-    int stopBowing();
+    int enable(bool bEnable = true);
+    int prepareToPlay(const int bowChanges[], int numChanges, int nPitches, int stringId[]);
 
     int changeDirection();
 
@@ -61,13 +63,16 @@ private:
     BowDirection m_CurrentDirection = BowDirection::Down;
 
     float* m_afBowTrajectory = nullptr;
+    int* m_aiStringId = nullptr;
     int m_iNPitches = 0;
+    int m_iCurrentTrajIdx = 0; 
+
+    float m_fAngle = 0;
 
     Epos4 m_epos;
     volatile int32_t m_iCurrentPosition = 0;
 
-    Dynamixel m_pitchDxl, m_rollDxl, m_yawDxl;
-    float m_fPitch = PITCH_AVG;
+    Dynamixel m_leftDxl, m_rightDxl, m_slideDxl;
     HardwareTimer m_dxlTimer;
 
     BowController(PortHandler& portHandler);
@@ -79,3 +84,5 @@ private:
     void encoderPositionCallback(int32_t encPos);
     static void dxlUpdateCallback();
 };
+
+#endif // BOWCONTROLLER_H

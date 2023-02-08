@@ -12,8 +12,9 @@ Epos4::Epos4(BowController* pBowController, void (BowController::* pBowCallback)
 
 }
 
-int Epos4::init(int iNodeID) {
+int Epos4::init(int iNodeID, bool inverted) {
     m_uiNodeID = iNodeID;
+    if (inverted) m_iDirMultiplier = -1;
     m_currentNMTState = PreOperational;
 
     int err;
@@ -609,6 +610,8 @@ int Epos4::setHomingCurrentThreshold(_WORD currentThreshold) {
 }
 
 int Epos4::moveToPosition(int32_t pos, bool bWait) {
+    pos *= m_iDirMultiplier;
+
     LOG_LOG("position: %i", pos);
     int err;
     // Target position
@@ -866,7 +869,7 @@ int Epos4::PDO_processMsg(can_message_t& msg) {
         if (m_pFingerController != nullptr)
             (m_pFingerController->*m_pFingerCallback)(m_iEncoderPosition * ENCODER_DIR);
         if (m_pBowController != nullptr)
-            (m_pBowController->*m_pBowCallback)(m_iEncoderPosition);
+            (m_pBowController->*m_pBowCallback)(m_iEncoderPosition * m_iDirMultiplier);
 
         callbackEncPos = m_iEncoderPosition;
     }
@@ -882,6 +885,7 @@ int Epos4::PDO_processMsg(can_message_t& msg) {
 }
 
 int Epos4::PDO_setPosition(int32_t position) {
+    position *= m_iDirMultiplier;
     // LOG_LOG("%i", position);
 
     uint8_t LSB = 0x0F;

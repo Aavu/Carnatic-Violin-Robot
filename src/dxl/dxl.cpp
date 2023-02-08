@@ -1,10 +1,12 @@
 #include "dxl.h"
 
-Dynamixel::Dynamixel(DxlID id,
+Dynamixel::Dynamixel(DxlID id, 
     PortHandler& portHandler,
-    dynamixel::PacketHandler& packetHandler) : m_id((int) id),
+    dynamixel::PacketHandler& packetHandler,
+    int32_t zeroPosition) : m_id((int) id),
     m_pPacketHandler(&packetHandler),
     m_pPortHandler(portHandler.getdxlPortHandler()),
+    m_iZero(zeroPosition),
     m_bIsEnabled(false) {}
 
 Dynamixel::~Dynamixel() {
@@ -44,6 +46,9 @@ int Dynamixel::torque(bool bEnable) {
 int Dynamixel::moveToPosition(int32_t position_pulses, bool bWait, long timeout_ms) {
     uint8_t dxl_error = 0;
     int dxl_comm_result = COMM_TX_FAIL;
+
+    position_pulses += m_iZero;
+
     dxl_comm_result = m_pPacketHandler->write4ByteTxRx(m_pPortHandler, m_id, ADDR_GOAL_POSITION, position_pulses, &dxl_error);
     if (dxl_comm_result != COMM_SUCCESS) {
         LOG_ERROR("%s", m_pPacketHandler->getTxRxResult(dxl_comm_result));
