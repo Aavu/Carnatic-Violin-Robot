@@ -1,6 +1,7 @@
-/cmake-build-debug/
-/cmake-build-debug-hathaani/
+/__pycache__
 .gitignore
-pitches.txt
-/Examples/
+**/.DS_Store
+**/*.wav
 /.idea/
+**/.vscode/
+/rmvpe/rmvpe.pt
