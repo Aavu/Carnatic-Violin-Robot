@@ -1,21 +1,17 @@
-import dataclasses
-
 import librosa
 import numpy as np
 from matplotlib import pyplot as plt
 from utils import Util
 from definitions import *
-from pitchTrack import PitchTrack
 from udpHandler import UDPHandler
 from typing import Tuple, List
 
 
 class Hathaani:
     # Total range of notes that can be played on a violin with tuning D A D A (on E A D G)
-    NOTE_RANGE = [57, 94]
-    TUNING = [74, 69, 62, 57]  # E A D G strings
+    NOTE_RANGE = Range(57, 94)
     # Maximum semitones a string can support
-    RANGE_PER_STRING = 12
+    RANGE_PER_STRING = 10
     TONIC = librosa.note_to_midi('D3')
 
     NUM_ACTUATORS = 7
@@ -46,6 +42,22 @@ class Hathaani:
             # Make sure the last change matches the original since this is denotes length of the array
             temp[-1] = changes[-1]
             return temp
+
+        @staticmethod
+        def filter_string_changes(changes: List[Tuple[int, int, int, float]],
+                                  min_length_suggestion: int, range_per_string: int):
+            i = 0
+            while i < len(changes) - 1:
+                s, e, sid, maxp = changes[i]
+                ns, ne, n_sid, n_maxp = changes[i + 1]
+                l = e - s
+                if (l < min_length_suggestion) and (sid < n_sid) and (
+                        maxp - TUNING[n_sid] < range_per_string):
+                    changes[i + 1] = (s, ne, n_sid, max(maxp, n_maxp))
+                    changes.remove(changes[i])
+                else:
+                    i += 1
+            return changes
 
         @staticmethod
         def to_bow_height_mm(amplitudes: np.ndarray, changes: List[Tuple[int, int, int, float]]):
@@ -159,7 +171,6 @@ class Hathaani:
             cent = np.minimum(1.0, left_hand * 1.0 / FINGERBOARD_LENGTH)
             dev = 1 - ((finger - FINGER_HEIGHT.OFF) / (FINGER_HEIGHT.ON - FINGER_HEIGHT.OFF))
             finger -= dev * cent * STRING_HEIGHT.END
-            # return Util.zero_lpf(np.maximum(finger, 0), 0.25)
             return np.maximum(finger, 0)
 
         @staticmethod
@@ -184,6 +195,11 @@ class Hathaani:
             return new_height
 
         @staticmethod
+        def adjust_bow_height_for_left_hand(height: np.ndarray, left_hand_mm: np.ndarray, deviation: int):
+            dev = deviation * np.minimum(1.0, left_hand_mm / SCALE_LENGTH)
+            return height + dev
+
+        @staticmethod
         def adjust_for_deviations(x: np.ndarray) -> np.ndarray:
             """
             Adjust for all deviations.
@@ -197,6 +213,9 @@ class Hathaani:
             # String change deviation
             x[:, MotorId.STRING_CHG] = Hathaani.Util.adjust_string_change_deviation(x[:, MotorId.STRING_CHG],
                                                                                     x[:, MotorId.LEFT_HAND])
+            x[:, MotorId.BOW_D_LEFT] = Hathaani.Util.adjust_bow_height_for_left_hand(x[:, MotorId.BOW_D_LEFT],
+                                                                                     x[:, MotorId.LEFT_HAND],
+                                                                                     BOW_HEIGHT_VERTICAL_DEVIATION)
             # TODO: Bow height for center deviations
 
             return x
@@ -242,9 +261,8 @@ class Hathaani:
         self.TONIC = librosa.note_to_midi(tonic) if isinstance(tonic, str) else tonic
         self.hop = hop_size
         self.fs = sample_rate
-        time_per_sample = hop_size / sample_rate
-        self.finger_press_time = int(round(FINGER_PRESS_TIME_MS / (time_per_sample * 1000)))
-        self.pitch_tracker = PitchTrack('pyin', hop_size=hop_size)
+        self.time_per_sample = hop_size / sample_rate
+        self.finger_press_time = int(round(FINGER_PRESS_TIME_MS / (self.time_per_sample * 1000)))
         self.last_bow_direction = 1  # Since its norm to start from down bow, last direction is up
 
         self.network_handler = None
@@ -336,22 +354,36 @@ class Hathaani:
 
         self.terminate()
 
-    def perform(self, phrase: np.ndarray, phrase_tonic: float, interpolate_start=False, interpolate_end=False):
+    def perform(self, phrase: np.ndarray, phrase_tonic: float, interpolate_start=False, interpolate_end=False,
+                min_bow_length_ms=100,
+                smoothing_alpha=0.95, tb_cent=0.01):
         # phrase is of shape (2, N)
         # 1st dim is pitches and 2nd dim is envelope
         pitches, envelope = phrase
-        pitches = Util.transpose_to_range(pitches, self.NOTE_RANGE[0])
+        pitches = Util.transpose_to_range(pitches, self.NOTE_RANGE.MIN)
 
         pitches[pitches < 1] = np.nan
         pitches, nan = Util.interpolate_nan(pitches)
+        # filter nans that are less than finger press time
+        nan = Util.filter_nan(nan, length=self.finger_press_time)
         pitches = Util.zero_lpf(pitches, 0.3, restore_zeros=True, ignore_zeros=True)
         pitches = pitches - phrase_tonic + self.TONIC
 
-        out = self.get_fingerboard_traversal_trajectories(pitches, nan, phrase_tonic,
+        sta = Util.pick_stationary_points(pitches, return_sta=True)
+        bow_changes = self.get_bow_changes(envelope, nan, min_bow_length_ms, smoothing_alpha, tb_cent=tb_cent)
+        # str_changes = self.get_string_changes(pitches, sta, min_bow_length_ms)
+        # print(str_changes)
+        str_changes = self.get_string_changes_by_bow_change(pitches, bow_changes, min_bow_length_ms)
+        print(str_changes)
+        print(bow_changes)
+
+        out = self.get_fingerboard_traversal_trajectories(pitches, str_changes, sta,
                                                           interpolate_pitch_start=interpolate_start,
                                                           interpolate_pitch_end=interpolate_end)
-        left_hand, string_change, finger, changes, nan, ostr = out
-        bow_rotor, bow_height, bow_rotation = self.get_bowing_trajectories(envelope, changes, nan, smoothing_alpha=0.95)
+        left_hand, string_change, finger, ostr = out
+
+        bow_rotor, bow_height, bow_rotation = self.get_bowing_trajectories(envelope, str_changes, bow_changes,
+                                                                           smoothing_alpha=smoothing_alpha)
         data = np.zeros((len(pitches), 7))
         data[:, MotorId.LEFT_HAND] = left_hand
         data[:, MotorId.STRING_CHG] = string_change
@@ -370,15 +402,15 @@ class Hathaani:
         if not SIMULATE:
             self.network_handler.add_to_queue(motor_data)
 
-        n = (len(ostr) + 1) * 100 + 11
-        plt.subplot(n)
-        plt.plot(pitches)
-        for i, p in enumerate(ostr):
-            n = (len(ostr) + 1) * 100 + 10 + (i + 2)
-            plt.subplot(n)
-            plt.plot(p)
-
-        plt.show()
+        # n = (len(ostr) + 1) * 100 + 11
+        # plt.subplot(n)
+        # plt.plot(pitches)
+        # for i, p in enumerate(ostr):
+        #     n = (len(ostr) + 1) * 100 + 10 + (i + 2)
+        #     plt.subplot(n)
+        #     plt.plot(p)
+        #
+        # plt.show()
 
         for i, d in enumerate(motor_data.T):
             n = len(motor_data.T) * 100 + 10 + (i + 1)
@@ -387,28 +419,28 @@ class Hathaani:
         plt.show()
 
     def get_string(self, pitch: float, current_string_id=None):
-        candidates = np.zeros_like(self.TUNING) - 1
-        for i in range(len(self.TUNING)):
-            if self.TUNING[i] <= pitch < self.RANGE_PER_STRING + self.TUNING[i]:
+        candidates = np.zeros_like(TUNING) - 1
+        for i in range(len(TUNING)):
+            if 0 <= pitch - TUNING[i] < self.RANGE_PER_STRING:
                 # Possible to play on ith string
                 if current_string_id is not None:
                     candidates[i] = abs(current_string_id - i)
                 else:
-                    return i, self.TUNING[i]
+                    return i, TUNING[i]
 
-        sid = len(self.TUNING)
-        min_loss = len(self.TUNING)
+        sid = len(TUNING)
+        min_loss = len(TUNING)
         for i, c in enumerate(candidates):
             if 0 < c < min_loss:
                 sid = i
                 min_loss = c
 
-        if sid >= len(self.TUNING):
+        if sid >= len(TUNING):
             return None, None
-        return sid, self.TUNING[sid]
+        return sid, TUNING[sid]
 
-    def get_string_changes(self, pitches, min_length_suggestion):
-        sta = Util.pick_stationary_points(pitches, return_sta=True)
+    def get_string_changes(self, pitches, sta, min_length_suggestion_ms):
+        min_length_suggestion = int(round(min_length_suggestion_ms / (self.time_per_sample * 1000)))
         changes: List[Tuple[int, int, int, float]] = []
         sid, os_note = self.get_string(pitches[0])
 
@@ -420,61 +452,99 @@ class Hathaani:
         if pitch_high - open_string_note < self.RANGE_PER_STRING:
             print("Can be played in 1 string!")
             changes.append((0, len(pitches), string_id, pitch_high))
-        else:
-            l = 0
-            length = 1
-            for r in sta:
-                if l == r:
-                    continue
+            return changes, sta
 
-                min_pitch = np.min(pitches[l: r])
-                max_pitch = np.max(pitches[l: r])
-                # if increasing trend
-                if pitches[r] - pitches[l] > 0:
-                    if max_pitch - os_note >= self.RANGE_PER_STRING:
-                        sid, os_note = self.get_string(min_pitch, sid)
-                    # if the pitch is over 7 + 3 semitones,
-                    elif max_pitch - os_note > 10 and length > min_length_suggestion:
-                        sid, os_note = self.get_string(min_pitch, sid)
-                else:
-                    if min_pitch - os_note < 0:
-                        sid, os_note = self.get_string(min_pitch, sid)
-                    elif min_pitch - os_note < 4 and length > min_length_suggestion:
-                        sid, os_note = self.get_string(min_pitch, sid)
+        l = 0
+        length = 1
+        for r in sta:
+            if l == r:
+                continue
 
-                if r == len(pitches) - 1:
-                    r = len(pitches)
+            min_pitch = np.min(pitches[l: r])
+            max_pitch = np.max(pitches[l: r])
+            # if increasing trend
+            if pitches[r] - pitches[l] > 0:
+                if max_pitch - os_note >= self.RANGE_PER_STRING:
+                    sid, os_note = self.get_string(min_pitch, sid)
+                # if the pitch is over 7 + 3 semitones,
+                elif max_pitch - os_note > 10 and length > min_length_suggestion:
+                    sid, os_note = self.get_string(min_pitch, sid)
+            else:
+                if min_pitch - os_note < 0:
+                    sid, os_note = self.get_string(min_pitch, sid)
+                elif min_pitch - os_note < 4 and length > min_length_suggestion:
+                    sid, os_note = self.get_string(min_pitch, sid)
 
-                if len(changes) > 0 and changes[-1][2] == sid:
-                    changes[-1] = (changes[-1][0], r, sid, max(changes[-1][-1], max_pitch))
-                else:
-                    changes.append((l, r, sid, max_pitch))
+            if r == len(pitches) - 1:
+                r = len(pitches)
 
-                l = r
+            if len(changes) > 0 and changes[-1][2] == sid:
+                changes[-1] = (changes[-1][0], r, sid, max(changes[-1][-1], max_pitch))
+            else:
+                changes.append((l, r, sid, max_pitch))
 
-            i = 0
-            while i < len(changes) - 1:
-                s, e, sid, maxp = changes[i]
-                ns, ne, n_sid, n_maxp = changes[i + 1]
-                l = e - s
-                if (l < min_length_suggestion) and (sid < n_sid) and (
-                        maxp - self.TUNING[n_sid] < self.RANGE_PER_STRING):
-                    changes[i + 1] = (s, ne, n_sid, max(maxp, n_maxp))
-                    changes.remove(changes[i])
-                else:
-                    i += 1
-        return changes, sta
+            l = r
 
-    def get_fingerboard_traversal_trajectories(self, pitches, nan, min_length_suggestion=100,
+        changes = Hathaani.Util.filter_string_changes(changes, min_length_suggestion, self.RANGE_PER_STRING)
+        return changes
+
+    def get_string_changes_by_bow_change(self,
+                                         pitches: np.ndarray,
+                                         bow_changes: List[Tuple[int, int]],
+                                         min_length_suggestion_ms: int) -> List[Tuple[int, int, int, float]]:
+        min_length_suggestion = int(round(min_length_suggestion_ms / (self.time_per_sample * 1000)))
+        changes: List[Tuple[int, int, int, float]] = []
+
+        sid, os_note = self.get_string(pitches[0])
+
+        # check if it can play in 1 string.
+        # String id is guaranteed to be not none since we transpose pitches to range.
+        pitch_low, pitch_high = np.min(pitches), np.max(pitches)
+        string_id, open_string_note = self.get_string(pitch_low)
+
+        if pitch_high - open_string_note < self.RANGE_PER_STRING:
+            print("Can be played in 1 string!")
+            changes.append((0, len(pitches), string_id, pitch_high))
+            return changes
+
+        l = 0
+        for r, valid in bow_changes:
+            if l == r:
+                continue
+
+            # if valid == 0:
+            #     l = r
+            #     continue
+
+            if r == len(pitches) - 1:
+                r = len(pitches)
+
+            min_pitch = np.min(pitches[l: r])
+            max_pitch = np.max(pitches[l: r])
+            # print(l, r, min_pitch, max_pitch, os_note, max_pitch - os_note, self.RANGE_PER_STRING, sid)
+            if max_pitch - os_note > self.RANGE_PER_STRING or min_pitch < os_note:
+                sid, os_note = self.get_string(min_pitch, sid)
+
+            # edge case. If a subphrase is > RANGE_PER_STRING, revert back to v1
+            if max_pitch - os_note > self.RANGE_PER_STRING or min_pitch < os_note:
+                print("reverting to string change computation using STAs")
+
+            if len(changes) > 0 and changes[-1][2] == sid:
+                changes[-1] = (changes[-1][0], r, sid, max(changes[-1][-1], max_pitch))
+            else:
+                changes.append((l, r, sid, max_pitch))
+            l = r
+
+        changes = Hathaani.Util.filter_string_changes(changes, min_length_suggestion, self.RANGE_PER_STRING)
+        return changes
+
+    def get_fingerboard_traversal_trajectories(self, pitches, changes, sta,
                                                interpolate_pitch_start=False, interpolate_pitch_end=False):
         # If it cannot be played in 1 string
         # Split the phrase into chunks using open tuning ranges
         # For each chunk, assign a string
         # Return trajectories
-
-        changes, sta = self.get_string_changes(pitches, min_length_suggestion)
-
-        ostr = np.zeros((len(self.TUNING), len(pitches)))
+        ostr = np.zeros((len(TUNING), len(pitches)))
         left_hand = np.zeros_like(pitches)
         string_change = np.zeros_like(pitches)
         finger = np.zeros_like(pitches) + FINGER_HEIGHT.OFF
@@ -482,7 +552,7 @@ class Hathaani:
         prev_sid = None
         prev_sc = None
         for i, (l, r, sid, _) in enumerate(changes):
-            left_hand[l: r] = Hathaani.Util.to_left_hand_position_mm(pitches[l: r] - self.TUNING[sid])
+            left_hand[l: r] = Hathaani.Util.to_left_hand_position_mm(pitches[l: r] - TUNING[sid])
             offset = 1 + self.finger_press_time // 2
             string_change_position_id = Hathaani.Util.string_id_to_mm(sid, prev_sid)
             if prev_sc is not None:
@@ -498,11 +568,11 @@ class Hathaani:
             prev_sid = sid
             prev_sc = string_change[r - 1]
 
-        left_hand[-1] = Hathaani.Util.to_left_hand_position_mm(pitches[-1] - self.TUNING[sid])
+        left_hand[-1] = Hathaani.Util.to_left_hand_position_mm(pitches[-1] - TUNING[prev_sid])
 
         # Finger off during invalid pitches
-        for n in nan:
-            finger[n[0]: n[1]] = FINGER_HEIGHT.OFF
+        # for n in nan:
+        #     finger[n[0]: n[1]] = FINGER_HEIGHT.OFF
 
         first_sta = Util.get_nearest_sta(sta, 1, lower=False)
         last_sta = Util.get_nearest_sta(sta, len(pitches) - 2, lower=True)
@@ -512,14 +582,41 @@ class Hathaani:
         if interpolate_pitch_end:
             left_hand[last_sta:] = Util.interp(left_hand[last_sta], left_hand[-1], len(left_hand) - last_sta)
 
-        ostr[sid, -1] = left_hand[-1]
+        ostr[prev_sid, -1] = left_hand[-1]
         left_hand = Util.zero_lpf(left_hand, 0.3, restore_zeros=False)
         string_change = Util.zero_lpf(string_change, 0.3, restore_zeros=False)
         finger = Util.zero_lpf(finger, 0.3, restore_zeros=False)
-        return left_hand, string_change, finger, changes, nan, ostr
+        return left_hand, string_change, finger, ostr
 
-    def get_bowing_trajectories(self, envelope: np.ndarray, string_changes, nan,
-                                min_bow_length_ms=100, smoothing_alpha=0.9):
+    def get_bow_changes(self, envelope: np.ndarray, nan,
+                        min_bow_length_ms=100, smoothing_alpha=0.9, tb_cent=0.01) -> List[Tuple[int, int]]:
+        min_bow_length = int(round(min_bow_length_ms / (self.time_per_sample * 1000)))
+        changes = Util.pick_dips(envelope, self.fs, self.hop, smoothing_alpha, wait_ms=min_bow_length_ms)
+        changes = [0] + changes + [len(envelope)]  # ex: [0, 73, 141, 723]
+        changes = Hathaani.Util.filter_bow_changes(changes, tb_cent, min_bow_length=min_bow_length)
+
+        # For all changes, if the idx is in-between nans, remove that index
+        temp = set()
+        for c in changes:
+            should_add = True
+            for n in nan:
+                if n[0] - min_bow_length <= c <= n[1] + min_bow_length:
+                    should_add = False
+                    break
+            if should_add or len(nan) == 0:
+                temp.add((c, 1))
+
+        changes = temp.copy()
+
+        # Add nan boundaries to changes
+        for n in nan:
+            changes.add((n[0], 0))
+            changes.add((n[1], 1))
+
+        return sorted(list(changes))
+
+    def get_bowing_trajectories(self, envelope: np.ndarray, string_changes, bow_changes,
+                                smoothing_alpha=0.9, tb_cent=0.01):
 
         lpf_e = Util.zero_lpf(envelope, smoothing_alpha, restore_zeros=False)
 
@@ -533,15 +630,13 @@ class Hathaani:
                 lpf_e[i + o:i + offset + o] = traj1
                 lpf_e[i + offset + o: i + (2 * offset) + o] = traj2
 
-        changes = Util.pick_dips(envelope, self.fs, self.hop, smoothing_alpha=0.9, wait_ms=min_bow_length_ms)
-        changes = [0] + changes + [len(envelope)]  # ex: [0, 73, 141, 723]
-        bow = self.generate_bow_rotor_trajectory(changes, nan,
+        bow = self.generate_bow_rotor_trajectory(bow_changes,
                                                  min_velocity=BOW_MIN_VELOCITY, max_velocity=BOW_MAX_VELOCITY,
-                                                 bow_min=BOW_ROTOR.MIN, bow_max=BOW_ROTOR.MAX)
+                                                 bow_min=BOW_ROTOR.MIN, bow_max=BOW_ROTOR.MAX, tb_cent=tb_cent)
         bow_height = Hathaani.Util.to_bow_height_mm(lpf_e, string_changes)
         bow_rotation = self.generate_bow_rotation_trajectory(string_changes)
         # correct for differential center deviations
-        bow_height = Hathaani.Util.adjust_bow_height_for_center_deviations(bow_height, bow_rotation, string_changes)
+        # bow_height = Hathaani.Util.adjust_bow_height_for_center_deviations(bow_height, bow_rotation, string_changes)
 
         bow_height = Util.zero_lpf(bow_height, 0.3, restore_zeros=False)
 
@@ -549,32 +644,11 @@ class Hathaani:
 
     def generate_bow_rotor_trajectory(self,
                                       changes: list,
-                                      nan: List[Tuple[int, int]],
                                       min_velocity=0.25,  # % of bow_length/sec
                                       max_velocity=1.0,  # % of bow_length/sec
-                                      min_bow_length=10,
                                       bow_min=0.0, bow_max=1.0,
                                       tb_cent=0.01) -> np.ndarray:
         direction = 1 ^ self.last_bow_direction  # 0 means down bow, 1 means up bow
-        changes = Hathaani.Util.filter_bow_changes(changes, tb_cent, min_bow_length)
-        # For all changes, if the idx is in-between nans, remove that index
-        temp = set()
-        for c in changes:
-            if len(nan) > 0:
-                for n in nan:
-                    if c < n[0] or c > n[1]:
-                        temp.add((c, 1))
-            else:
-                temp.add((c, 1))
-
-        changes = temp.copy()
-
-        # Add nan boundaries to changes
-        for n in nan:
-            changes.add((n[0], 0))
-            changes.add((n[1], 1))
-
-        changes = sorted(list(changes))
         num_segments = len(changes) - 1
         # ex: if changes = [0, 73, 141, 723], t_seg = [(0, 73, 1), (73, 141, 1), (141, 723, 1)]
         # the 3rd value denotes if it is a valid segment (1) or nans (0)
@@ -599,7 +673,7 @@ class Hathaani:
             seg = (t_seg[i, 0], t_seg[i, 1])
             seg_len = seg[1] - seg[0]
 
-            # If it is a nan region, dont move the bow
+            # If it is a nan region, don't move the bow
             if t_seg[i, 2] == 0:  # nan region
                 direction ^= 1  # revert the direction that was changed during last iteration
                 bow[seg[0]:seg[1]] = p0

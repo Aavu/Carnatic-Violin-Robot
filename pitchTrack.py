@@ -72,7 +72,7 @@ class PitchTrack:
         return out
 
     def _pyin_track_(self, audio, sample_rate, **kwargs):
-        out, flag, _ = librosa.pyin(y=audio, sr=sample_rate, **kwargs)
+        out, flag, prob = librosa.pyin(y=audio, sr=sample_rate, **kwargs)
         out = Util.zero_lpf(out, 0.25, ignore_zeros=True)
         out[flag == False] = np.nan
         return out

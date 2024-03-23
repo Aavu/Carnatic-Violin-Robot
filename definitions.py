@@ -28,10 +28,19 @@ GT2_PULLEY_RADIUS = 5.05  # mm
 ENCODER_TICKS_PER_TURN = [2048, 1024, 1024, 1024, 1024, 1024, 1024]  # ticks per 90 deg turn
 FINGER_GEAR_RADIUS = 12.0  # mm
 
-FINGER_PRESS_TIME_MS = 100  # ms
+FINGER_PRESS_TIME_MS = 50  # ms
 
 # center of the fingerboard wrt string change reference bolt (- finger stage length)
 CENTER_LINE = 24.5
+
+BOW_HEIGHT_VERTICAL_DEVIATION = 5
+
+
+class Tuning(NamedTuple):
+    E: int = 74
+    A: int = 69
+    D: int = 62
+    G: int = 57
 
 
 class MotorId(IntEnum):
@@ -143,8 +152,8 @@ class BowHeight(NamedTuple):
     # A - 53mm, -8deg
     # E - 42mm, -25deg
     E: Range = Range(40, 42.5)
-    A: Range = Range(50.5, 56)
-    D: Range = Range(53, 57)
+    A: Range = Range(50.5, 60)
+    D: Range = Range(53, 60)
     G: Range = Range(44, 48)
     REST: float = 0
 
@@ -159,6 +168,7 @@ class BowRotor(NamedTuple):
 
 
 # We will need to create instances of the NamedTuple before using them
+TUNING = Tuning()  # E A D G strings
 TICKS = Ticks()
 STR_CHG_POS = StringChangePosition()
 STR_DIST_BRIDGE = StringDistanceOnBridge()

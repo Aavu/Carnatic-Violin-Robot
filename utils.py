@@ -46,6 +46,14 @@ class Util:
         return pitches, nan
 
     @staticmethod
+    def filter_nan(nan: List[Tuple[int, int]], length: int) -> List[Tuple[int, int]]:
+        out = []
+        for (s, e) in nan:
+            if e - s >= length:
+                out.append((s, e))
+        return out
+
+    @staticmethod
     def split(audio: np.ndarray,
               silence_bounds: np.ndarray,
               min_samples: int) -> List[Tuple[np.ndarray, int]]:
