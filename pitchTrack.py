@@ -60,6 +60,7 @@ class PitchTrack:
             audio = audio.detach().cpu().numpy()
 
         out = self.algorithm(audio=audio, sample_rate=fs, **self.param)
+
         zeros = out < 1
         if return_cents:
             out[zeros] = 1
@@ -71,11 +72,12 @@ class PitchTrack:
 
         return out
 
-    def _pyin_track_(self, audio, sample_rate, **kwargs):
+    def _pyin_track_(self, audio, sample_rate, return_cents, **kwargs):
         out, flag, prob = librosa.pyin(y=audio, sr=sample_rate, **kwargs)
         out = Util.zero_lpf(out, 0.25, ignore_zeros=True)
         out[flag == False] = np.nan
         return out
 
-    def _crepe_track_(self, audio, sample_rate, **kwargs):
-        return crepe.predict(audio, sample_rate, viterbi=True, verbose=0)
+    def _crepe_track_(self, audio, sample_rate, return_cents, **kwargs):
+        out = crepe.predict(audio, sample_rate, viterbi=True, verbose=0)
+        return out

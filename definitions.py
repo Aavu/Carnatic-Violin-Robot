@@ -9,13 +9,15 @@ SIMULATE = True
 DEVICE_IP = "10.2.1.177"
 DEVICE_PORT = 8888
 
-SCALE_LENGTH = 330  # mm
+SCALE_LENGTH = 335  # mm
 """ Scale length of the violin - distance between the nut and the bridge in mm"""
 
+NUT_POSITION_MM = 15
 FINGERBOARD_LENGTH = 270  # mm
 
-BOW_MIN_VELOCITY = 0.25  # % of bow_length/sec
-BOW_MAX_VELOCITY = 1.0  # % of bow_length/sec
+BOW_MIN_VELOCITY = 0.1  # % of bow_length/sec
+""" Minimum speed of the bow rotor """
+BOW_MAX_VELOCITY = 1  # % of bow_length/sec
 """ Maximum speed of the bow rotor """
 
 BOW_ANGLE_LIMIT = math.pi / 4
@@ -29,11 +31,13 @@ ENCODER_TICKS_PER_TURN = [2048, 1024, 1024, 1024, 1024, 1024, 1024]  # ticks per
 FINGER_GEAR_RADIUS = 12.0  # mm
 
 FINGER_PRESS_TIME_MS = 50  # ms
+STRING_CHANGE_TIME_MS = 100  # ms
 
 # center of the fingerboard wrt string change reference bolt (- finger stage length)
 CENTER_LINE = 24.5
 
-BOW_HEIGHT_VERTICAL_DEVIATION = 5
+BOW_HEIGHT_VERTICAL_DEVIATION = -50   # mm
+BOW_HEIGHT_CHANGE_FOR_OPEN_STRING_NOTE = -0.25  # mm
 
 
 class Tuning(NamedTuple):
@@ -59,33 +63,15 @@ class MotorId(IntEnum):
 
 class Ticks(NamedTuple):
     """
-    Conversion factors to transform values in mm to encoder ticks.
+    Conversion factors to transform values in mm (except bow slide) to encoder ticks.
     """
     FINGER: float = ENCODER_TICKS_PER_TURN[MotorId.FINGER] * 4 / (2 * math.pi * FINGER_GEAR_RADIUS)
     STRING_CHG: float = ENCODER_TICKS_PER_TURN[MotorId.STRING_CHG] * 4 / (2 * math.pi * GT2_PULLEY_RADIUS)
     LEFT_HAND: float = ENCODER_TICKS_PER_TURN[MotorId.LEFT_HAND] * 4 / (2 * math.pi * GT2_PULLEY_RADIUS)
     BOW_D_LEFT: float = ENCODER_TICKS_PER_TURN[MotorId.BOW_D_LEFT] * 4 / (2 * math.pi * GT2_PULLEY_RADIUS)
     BOW_D_RIGHT: float = ENCODER_TICKS_PER_TURN[MotorId.BOW_D_RIGHT] * 4 / (2 * math.pi * GT2_PULLEY_RADIUS)
-    BOW_SLIDE: float = 1  # Not used
+    BOW_SLIDE: float = 750
     BOW_ROTOR: float = ENCODER_TICKS_PER_TURN[MotorId.BOW_ROTOR] * 4 / (2 * math.pi * BOW_GEAR_RADIUS)
-
-
-# class Limit(IntEnum):
-#     """
-#     Max Limits of actuators in encoder ticks
-#     """
-#     LEFT_HAND = 26000
-#     STRING_CHANGE = 1024
-#     FINGER = 100
-#     BOW_LEFT_DIFF = 9700
-#     BOW_RIGHT_DIFF = 9700
-#     BOW_SLIDE = 0
-#     BOW_ROTOR = 38000
-
-
-class EndPoint(NamedTuple):
-    NUT: float
-    BRIDGE: float
 
 
 class Range(NamedTuple):
@@ -97,9 +83,9 @@ class StringChangePosition(NamedTuple):
     """
     Position from reference bolt measured at the (fingerboard nut, bridge) - in mm
     """
-    EA: EndPoint = EndPoint(CENTER_LINE + 5, CENTER_LINE + 18)
-    AD: EndPoint = EndPoint(CENTER_LINE, CENTER_LINE)
-    DG: EndPoint = EndPoint(CENTER_LINE - 5, CENTER_LINE + 18)
+    EA: Range = Range(CENTER_LINE + 5, CENTER_LINE + 18)
+    AD: Range = Range(CENTER_LINE, CENTER_LINE)
+    DG: Range = Range(CENTER_LINE - 5, CENTER_LINE + 18)
 
 
 class StringDistanceOnBridge(NamedTuple):
@@ -123,7 +109,7 @@ class StringHeight(NamedTuple):
 class FingerHeight(NamedTuple):
     """ units in mm. Rest is the top most position the finger can move to."""
     REST: float = 0
-    ON: float = 20
+    ON: float = 19
     OFF: float = 12  # Near nut
 
 
@@ -131,9 +117,9 @@ class BowAngle(NamedTuple):
     """
     Angle of the bow in radians to play each string
     """
-    E: float = -24 * math.pi / 180
-    A: float = -8 * math.pi / 180
-    D: float = 8 * math.pi / 180
+    E: float = -22.5 * math.pi / 180
+    A: float = -6 * math.pi / 180
+    D: float = 6 * math.pi / 180
     G: float = 24 * math.pi / 180
     REST: float = 0
 
@@ -141,21 +127,16 @@ class BowAngle(NamedTuple):
 class BowHeight(NamedTuple):
     """
     Denotes the height of bow from the string. \n
-    Minimum and maximum bow height corresponding to amplitudes 0.0, 1.0 respectively. \n
+    Minimum and maximum bow height corresponding to amplitudes 0.1, 1.0 respectively. \n
     MAX is when the bow is fully touching the strings without distortion. \n
     MIN is when the bow is just above the strings.
     Measurements are at bow angle = 0
     """
-    # bow placements
-    # G - 44mm, 27deg
-    # D - 55mm, 8 deg
-    # A - 53mm, -8deg
-    # E - 42mm, -25deg
-    E: Range = Range(40, 42.5)
-    A: Range = Range(50.5, 60)
-    D: Range = Range(53, 60)
-    G: Range = Range(44, 48)
-    REST: float = 0
+    E: Range = Range(44.5, 45.25)
+    A: Range = Range(55.25, 57)
+    D: Range = Range(55.5, 57)
+    G: Range = Range(45.5, 45.75)
+    REST: float = 50
 
 
 class BowRotor(NamedTuple):
@@ -163,8 +144,8 @@ class BowRotor(NamedTuple):
     Minimum and Maximum position of the bow in mm
     """
     MIN: float = 0
-    MAX: float = 380 - MIN
-    REST: float = MIN
+    MAX: float = 380
+    REST: float = 0
 
 
 # We will need to create instances of the NamedTuple before using them

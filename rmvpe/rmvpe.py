@@ -574,27 +574,25 @@ class RMVPE:
             hidden = self.model(mel)
             return hidden[:, :n_frames]
 
-    def decode(self, hidden, thred=0.03):
+    def decode(self, hidden, thred=0.03, return_cents=True):
         cents_pred = self.to_local_average_cents(hidden, thred=thred)
         f0 = 10 * (2 ** (cents_pred / 1200))
-        f0[f0 == 10] = 0
+        f0[f0 <= 10] = 0
         return f0
 
-    def infer_from_audio(self, audio, sample_rate, thred=0.03):
+    def infer_from_audio(self, audio, sample_rate, thred=0.03, return_cents=True):
         if sample_rate != self.fs:
             # resample audio if necessary
             from resampy import resample
             audio = resample(audio, sample_rate, self.fs)
         mel = self.mel_extractor(torch.from_numpy(audio).float().to(self.device).unsqueeze(0), center=True)
         hidden = self.mel2hidden(mel)[0]
-        f0 = self.decode(hidden, thred=thred)
+        f0 = self.decode(hidden, thred=thred, return_cents=return_cents)
         return f0
 
     def to_local_average_cents(self, salience, thred=0.05):
-        # t0 = ttime()
         center = np.argmax(salience, axis=1)  # 帧长#index
         salience = np.pad(salience, ((0, 0), (4, 4)))  # 帧长,368
-        # t1 = ttime()
         center += 4
         todo_salience = []
         todo_cents_mapping = []
@@ -609,10 +607,10 @@ class RMVPE:
         todo_cents_mapping = np.array(todo_cents_mapping)  # 帧长，9
         product_sum = np.sum(todo_salience * todo_cents_mapping, 1)
         weight_sum = np.sum(todo_salience, 1)  # 帧长
-        devided = product_sum / weight_sum  # 帧长
+        result = product_sum / weight_sum  # 帧长
         # t3 = ttime()
         maxx = np.max(salience, axis=1)  # 帧长
-        devided[maxx <= thred] = 0
+        result[maxx <= thred] = 0
         # t4 = ttime()
         # print("decode:%s\t%s\t%s\t%s" % (t1 - t0, t2 - t1, t3 - t2, t4 - t3))
-        return devided
+        return result

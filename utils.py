@@ -1,7 +1,8 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from scipy import signal
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import librosa
 
 
@@ -281,17 +282,16 @@ class Util:
                   hop_size: int = 160,
                   smoothing_alpha: float = 0.8,
                   silence_width_ms=50,
-                  wait_ms: int = 80) -> List:
+                  wait_ms: int = 80,
+                  normalize: bool = True) -> List:
+
+        max_e = np.max(e)
+        if normalize and max_e > 0:
+            e = e / max_e
+
         lpf_e = Util.zero_lpf(e, alpha=smoothing_alpha, restore_zeros=False)
         wait_samples = (wait_ms / 1000) / (hop_size / sample_rate)
         silence_width_samples = (silence_width_ms / 1000) / (hop_size / sample_rate)
-
-        # for i in e:
-        #     print(f"{i:.4f}", end=" ")
-        # print()
-        # for i in lpf_e:
-        #     print(f"{i:.4f}", end=" ")
-        # print()
 
         dips = []
         i = 0
@@ -324,9 +324,6 @@ class Util:
         # Check if the last dip satisfies the wait time requirement
         if len(dips) > 0 and len(e) - dips[-1] - 1 < wait_samples:
             dips = dips[:-1]
-
-        # for d in dips:
-        #     print(d, lpf_e[d] - e[d])
 
         return dips
 
@@ -443,16 +440,27 @@ class Util:
         return peaks, dips, sil
 
     @staticmethod
-    def get_nearest_sta(sta: np.ndarray, index: int, lower: bool, min_distance=10):
-        if lower:
-            for i in range(len(sta) - 1, -1, -1):
-                if index - sta[i] > min_distance:
-                    return sta[i]
-        else:
-            for i in range(len(sta)):
-                if sta[i] - index > min_distance:
-                    return sta[i]
-        return index
+    def get_nearest_sta(sta: np.ndarray, index: int, direction: int = 0, min_distance=10):
+        # TODO: Improve with binary search
+        nearest_lower = sta[0] if len(sta) > 0 else -1
+        for i in range(len(sta) - 1, -1, -1):
+            if index - sta[i] > min_distance:
+                nearest_lower = sta[i]
+                break
+
+        nearest_higher = sta[-1] if len(sta) > 0 else -1
+
+        for i in range(len(sta)):
+            if sta[i] - index > min_distance:
+                nearest_higher = sta[i]
+                break
+
+        if direction < 0:
+            return nearest_lower
+        elif direction > 0:
+            return nearest_higher
+
+        return min(nearest_lower, nearest_higher)
 
     @staticmethod
     def decompose_carnatic_components(x: np.ndarray,
@@ -520,7 +528,7 @@ class Util:
         return sta, cpn
 
     @staticmethod
-    def find_cpn(phrase, min_cpn_length=20, min_sub_phrase_length=5, cp_threshold=0.35):
+    def find_cpn(phrase, sta, min_cpn_length=10, min_sub_phrase_length=5, cp_threshold=0.35):
         filtered = Util.zero_lpf(phrase, 0.75)
         raw_cpn = [(phrase[0], 0, 1)]
 
@@ -532,18 +540,49 @@ class Util:
                 else:
                     raw_cpn.append((phrase[i], i, 1))
 
+        raw = []
         cpn = []
         for n, s, l in raw_cpn:
+            e = s + l
+            raw.append((int(np.round(np.median(phrase[s: e]))), s, e - s))
+            _s = Util.get_nearest_sta(sta, s, direction=1, min_distance=0)
+            e = Util.get_nearest_sta(sta, s + l, direction=-1, min_distance=0)
+            l = e - _s
             if l > min_cpn_length:
-                cpn.append((int(round(n)), s, l))
+                cpn.append((int(np.round(np.median(phrase[_s: e]))), _s, e - _s))
+        return cpn
+
+    @staticmethod
+    def find_cpn_v1(phrase, min_cp_length=10, min_sub_phrase_length=5, cp_threshold=0.3):
+        cpn = []
+
+        i = 1
+        while i < len(phrase):
+            if abs(phrase[i] - phrase[i-1]) < cp_threshold:
+                start_idx = i - 1
+                while i < len(phrase) and abs(phrase[i] - phrase[i-1]) < cp_threshold:
+                    i += 1
+
+                i -= 1
+                if i - start_idx > min_cp_length:
+                    if len(cpn) > 0 and cpn[-1][1] + cpn[-1][2] < min_sub_phrase_length:
+                        n, s, l = cpn[-1]
+                        n = round((n + np.median(phrase[start_idx: i + 1])) / 2)
+                        cpn[-1] = (int(n), s, l + i + 1 - start_idx)
+                    else:
+                        n = np.round(np.median(phrase[start_idx: i + 1]))
+                        cpn.append((int(n), start_idx, i + 1 - start_idx))
+            i += 1
 
         return cpn
 
     # refer: https://cs.gmu.edu/~kosecka/cs685/cs685-trajectories.pdf
     @staticmethod
-    def interp(q0, qf, N, tb_percentage=0.2, dtype=float):
+    def interp(q0, qf, N, tb_percentage=0.45, dtype=float):
+        if N < 2:
+            return np.array([q0, qf])[:N]
         _curve = np.zeros(N, dtype=dtype)
-        nb = max(1, int(tb_percentage * N))
+        nb = min(N - 1, max(1, int(tb_percentage * N)))
         a = (qf - q0) / (nb * (N - nb))
         Nb = np.arange(nb + 1)
         qA = q0 + 0.5 * a * (Nb ** 2)
@@ -552,3 +591,26 @@ class Util:
         _curve[N - nb:] = qB[:-1][::-1]
         _curve[nb:N - nb] = np.linspace(qA[-1], qB[-1], N - 2 * nb, dtype=dtype)
         return _curve
+
+    @staticmethod
+    def generate_trajectory(q0, v_max_cent, N, tb_percentage=0.2):
+        return Util.interp(q0, q0 + N * v_max_cent, N, tb_percentage)
+
+    @staticmethod
+    def pitch_correct(x: np.ndarray):
+        """
+        Given a pitch contour,
+        fix intonation by shifting all the STAs to the closest whole semitone and rebuilt contour by interpolating
+        :param x: Input pitch contour
+        :return: corrected contour, sta
+        """
+        sta = Util.pick_stationary_points(x, return_sta=True)
+        out = x.copy()
+        for i in range(len(sta) - 1):
+            s, e = sta[i], sta[i + 1]
+            q0, qf = round(x[s]), round(x[e])
+            l = e - s + 1 if e == len(x) - 1 else e - s
+            out[s: s + l] = Util.interp(q0, qf, l)
+
+        out[np.isnan(x)] = np.nan
+        return out

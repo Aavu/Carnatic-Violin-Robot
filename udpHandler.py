@@ -41,7 +41,6 @@ class UDPHandler:
         for d in data:
             try:
                 self.data_queue.put(d.flatten(), block=False, timeout=None)
-                print(d)
             except queue.Full:
                 print("Queue is full")
 
@@ -65,7 +64,7 @@ class UDPHandler:
                 pass
             except ConnectionResetError as e:
                 print(e)
-                self.callback(Command.TERMINATE)
+                self.callback(Command.RESTART)
 
             if data_tcp is not None:
                 data_tcp = int.from_bytes(data_tcp, "little")
