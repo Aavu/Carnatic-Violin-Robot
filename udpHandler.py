@@ -23,8 +23,6 @@ class UDPHandler:
         self.mutex = threading.Lock()
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # self.sock.bind(('', remote_port))
-        # self.sock.settimeout(timeout_sec)
 
         self.tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

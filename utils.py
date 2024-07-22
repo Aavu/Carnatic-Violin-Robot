@@ -28,6 +28,7 @@ class Util:
     @staticmethod
     def interpolate_nan(pitches: np.ndarray) -> Tuple[np.ndarray, List[Tuple[int, int]]]:
         nan = np.argwhere(np.isnan(pitches)).flatten()
+        assert not (np.isnan([pitches[0], pitches[-1]]).any()), "Please truncate pitches before calling this method"
         island = []
 
         for i in range(len(nan)):
@@ -68,6 +69,9 @@ class Util:
 
         def get_silence_length(idx):
             return silence_bounds[idx, 1] - silence_bounds[idx, 0]
+
+        if len(silence_bounds) == 0:
+            return [(audio, 0)]
 
         splits = []
         # starting
@@ -115,13 +119,14 @@ class Util:
         return chunks
 
     @staticmethod
-    def zero_lpf(x: np.ndarray, alpha, restore_zeros=True, ignore_zeros=False):
+    def zero_lpf(x: np.ndarray, alpha, restore_zeros=True, ignore_zeros=False, ignore_nans=False):
         # x0 = Util.lpf(x, alpha, restore_zeros=False, ignore_zeros=ignore_zeros)
         # x0 = torch.flip(x0, dims=(0,)) if type(x) == torch.Tensor else np.flip(x0, axis=(0,))
         # x0 = Util.lpf(x0, alpha, restore_zeros)
         # x0 = torch.flip(x0, dims=(0,)) if type(x) == torch.Tensor else np.flip(x0, axis=(0,))
 
         eps = 1e-2
+        nans = np.argwhere(np.isnan(x)).flatten()
         y = Util.fill_zeros(x, eps=eps) if ignore_zeros else x.copy()
 
         for i in range(1, len(x)):
@@ -134,6 +139,9 @@ class Util:
         # restore NULL values
         if restore_zeros:
             y[x < eps] = 0
+
+        if ignore_nans:
+            y[nans] = np.nan
 
         return y
 
@@ -281,9 +289,9 @@ class Util:
                   sample_rate: float = 16000,
                   hop_size: int = 160,
                   smoothing_alpha: float = 0.8,
-                  silence_width_ms=50,
+                  silence_width_ms=100,
                   wait_ms: int = 80,
-                  normalize: bool = True) -> List:
+                  normalize: bool = True) -> Tuple[List, List]:
 
         max_e = np.max(e)
         if normalize and max_e > 0:
@@ -292,7 +300,7 @@ class Util:
         lpf_e = Util.zero_lpf(e, alpha=smoothing_alpha, restore_zeros=False)
         wait_samples = (wait_ms / 1000) / (hop_size / sample_rate)
         silence_width_samples = (silence_width_ms / 1000) / (hop_size / sample_rate)
-
+        window = []
         dips = []
         i = 0
         while i < len(e):
@@ -306,6 +314,7 @@ class Util:
                 min_e = np.min(e[si: i])
                 if abs(mean_e - min_e) > 0.1:
                     dips.append(min_i)
+                    window.append((si, i))
             i += 1
 
         # rank and filter out until all dips are at least 'wait' distance apart
@@ -317,18 +326,21 @@ class Util:
             min_idx = np.argmin(dev)
 
             del dips[min_idx]
+            del window[min_idx]
 
         if len(dips) > 0 and dips[0] < wait_samples:
             dips = dips[1:]
+            window = window[1:]
 
         # Check if the last dip satisfies the wait time requirement
         if len(dips) > 0 and len(e) - dips[-1] - 1 < wait_samples:
             dips = dips[:-1]
+            window = window[:-1]
 
-        return dips
+        return dips, window
 
     @staticmethod
-    def truncate_phrase(midi, envelope=None):
+    def truncate(midi):
         # Truncate start
         start_idx = 0
         for i in range(len(midi)):
@@ -343,9 +355,7 @@ class Util:
                 end_idx = i
                 break
 
-        if envelope is not None:
-            envelope = envelope[start_idx: end_idx + 1]
-        return midi[start_idx: end_idx + 1], envelope
+        return start_idx, end_idx
 
     @staticmethod
     def get_quick_transitions(pitches, threshold):
@@ -424,10 +434,10 @@ class Util:
                 in_silent_region = False
                 continue
 
-            if x[i + 1] <= x[i] and x[i] > x[i - 1]:
+            if x[i] >= x[i + 1] and x[i] > x[i - 1]:
                 peaks.append(i)
 
-            elif x[i + 1] > x[i] and x[i] <= x[i - 1]:
+            elif x[i] < x[i + 1] and x[i] <= x[i - 1]:
                 dips.append(i)
 
         if return_sta:

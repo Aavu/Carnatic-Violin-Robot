@@ -59,7 +59,7 @@ class PitchTrack:
         if type(audio) == torch.Tensor:
             audio = audio.detach().cpu().numpy()
 
-        out = self.algorithm(audio=audio, sample_rate=fs, **self.param)
+        out = self.algorithm(audio=audio, sample_rate=fs, return_cents=return_cents, **self.param)
 
         zeros = out < 1
         if return_cents:
@@ -74,7 +74,7 @@ class PitchTrack:
 
     def _pyin_track_(self, audio, sample_rate, return_cents, **kwargs):
         out, flag, prob = librosa.pyin(y=audio, sr=sample_rate, **kwargs)
-        out = Util.zero_lpf(out, 0.25, ignore_zeros=True)
+        out = Util.zero_lpf(out, 0.1, ignore_zeros=True)
         out[flag == False] = np.nan
         return out
 

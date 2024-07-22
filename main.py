@@ -27,43 +27,58 @@ if __name__ == '__main__':
     while not robot.ready:
         time.sleep(0.25)
 
-    # robot.play_note(midi_note=64, amplitude=0.1, duration=5, tonic=50)
+    # robot.play_note(midi_note=64, amplitude=.5, duration=5, tonic=50)
 
-    # notes = [62, 64, 66, 67, 69]
-    # durations = [2, 2, 2, 2, 4]
-    # amplitudes = [1, 0.75, 0.5, 0.25, .1]
+    # notes = [62, 64, 66, 67, 69, 71, 73, 74, 0, 74, 73, 71, 69, 67, 66, 64, 62]
+    # durations = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    # amplitudes = [0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75]
     # robot.play_note_sequence(notes, durations, amplitudes, tonic=50)
 
-    audio, fs = librosa.load("audio/1-50-3.wav", sr=16000, duration=120)
+    audio, fs = librosa.load("audio/anandha.wav", sr=16000)
     hop_size = int(fs // 100)
 
-    bounds = Util.get_silence_bounds(audio, fs)
-    temp = Util.split(audio, bounds, int(fs / 2))
-    a = temp[6][0]
+    # bounds = Util.get_silence_bounds(audio, fs)
+    # temp = Util.split(audio, bounds, int(fs / 2))
+    # a = temp[4][0]
 
     pitch_tracker = PitchTrack('rmvpe', hop_size=hop_size, rmvpe_threshold=0.01)
 
     # for a, _ in temp:
-    e = Util.envelope(a, hop_size)
-    cents = pitch_tracker.track(a, fs, return_cents=True, fill_gaps=False)
-    # zero amplitudes have invalid pitches
-    cents[cents < 10] = np.nan
-    cents[e < 0.01] = np.nan
-    e[e < 0.01] = 0
-    # Invalid pitches have 0 amplitudes
-    e[np.isnan(cents)] = 0
-    cents, e = Util.truncate_phrase(cents, e)
-    n = min(len(cents), len(e))
+    e = Util.envelope(audio, hop_size)
+    cents = pitch_tracker.track(audio, fs, return_cents=True, fill_gaps=False)
     phrase = np.vstack([cents, e])
+    print(f"min pitch: {np.min(cents)}")
+    # Anandha - [0, 80, 130, 178, 227, 274]
+    # Arabhi - [0, 57, 161, 198, 235]
+    # Sahana - [0, 59, 145, 217] , start 150mm
+    # bhairavi - [0, 57, 96, 190, 236]
+    # Thodi - [0, 40, 74, 215]
+    # Suruti - [0, 56, 100, 209]
+    # neelambari - [0, 56, 97, 170, 360, 434, 535]
+    # Sindhu - [0, 28, 62, 228, 266, 300]
+    # Kaanada - [0, 33, 67, 115, 227, 267]
+    # Mohanam - [0, 41, 84, 166, 241, 295, 339, 424]
+    # Dhanyasi - [0, 38, 143, 198, 240], start 150mm
+    # Saveri - [0, 114, 223]
 
-    cents = Util.pitch_correct(cents)
-    # plt.subplot(211)
-    # plt.plot(cents)
-    # plt.subplot(212)
-    # plt.plot(e)
-    # plt.show()
-    robot.perform(phrase, phrase_tonic=50, interpolate_start=True)
-    print()
+    # spurita0 - [0, 48, 91, 127, 167, 204, 245, 285, 327]
+    # spurita1 - [0, 46, 86, 126, 163, 200, 240, 275, 320]
+    # spurita2 - [0, 46, 93, 132, 178, 217, 260, 303, 351]
+    # Kampita0 - [0, 94, 122, 153, 205]
+    # Kampita1 - [0, 104, 150, 197]
+    # Kampita2 - [0, 114]
+    # Nokku - [0, 36, 73, 109, 135, 175]
+    # Orikkai - [0, 46, 89, 133, 178]
+    # Kandippu2 - [0, 54, 98, 147]
+
+    bow_changes = [0, 80, 130, 178, 227, 274]
+    robot.perform(phrase, phrase_tonic=50,
+                  bow_changes=bow_changes,
+                  interpolate_start=True,
+                  amplitude_compression=0.9,
+                  pitch_correction_amount=0.5,
+                  fix_open_string_pitches=True)
+
 
     # fs = 16000
     # hop = 160
