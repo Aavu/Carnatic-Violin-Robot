@@ -12,7 +12,7 @@ void setup() {
     Error_t e = pHathaani->init();
 
     if (e != kNoError) {
-        LOG_ERROR("Error initializing socket. code: %i", (int) e);
+        LOG_ERROR("Error initializing hathaani. code: %i", (int) e);
         while (1) {}
     }
 }

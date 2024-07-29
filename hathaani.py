@@ -552,20 +552,24 @@ class Hathaani:
 
             data = self.process_chunk(pitches, envelope, bow_changes, dips, nan, fix_open_string_pitches, snap_to_sta,
                                       min_bow_length_ms, tb_cent, remove_invalid_bow_changes)
+            if i > len(bounds) - 2:
+                data[:, MotorId.LEFT_HAND] += 2
+            # if len(bounds) < 2:
+            #     data = self.add_transitions(data, duration_ms=STRING_CHANGE_TIME_MS * 2)
+            #     full_data.append(data)
 
-            if len(bounds) < 2:
-                data = self.add_transitions(data, duration_ms=STRING_CHANGE_TIME_MS * 2)
-                full_data.append(data)
-
-            elif prev_data is not None:
+            if prev_data is not None:
                 targets = data[0, :].copy()
                 targets[MotorId.BOW_D_LEFT] = BOW_HEIGHT.REST
                 targets[MotorId.BOW_ROTOR] = 0
-                prev_data = self.reset_positions(prev_data, targets=targets, length=200)
+                prev_data = self.reset_positions(prev_data, targets=targets, length=100)
                 self.current = prev_data[-1, :]
                 full_data.append(prev_data)
 
             data = self.add_transitions(data, duration_ms=STRING_CHANGE_TIME_MS * 2)
+
+            if i == len(bounds) - 1:
+                full_data.append(data)
 
             prev_data = data.copy()
 

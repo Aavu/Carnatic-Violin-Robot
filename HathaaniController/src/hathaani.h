@@ -34,14 +34,17 @@ public:
 
     Error_t init() {
         Error_t err;
-        if (initCAN() != kNoError)
+        err = initCAN();
+        if (err != kNoError)
             return err;
 
-        if (initNetwork() != kNoError)
+        err = initNetwork();
+        if (err != kNoError)
             return err;
 
 #ifndef SIMULATE
-        if (initMotors() != kNoError) {
+        err = initMotors();
+        if (err != kNoError) {
             reset();
             return err;
         }
@@ -132,27 +135,15 @@ public:
         delay(10);
 
         for (int i = 0; i < NUM_MOTORS; ++i) {
-            err = m_epos[i].setOpMode(ProfilePosition);
-            if (err != 0) {
-                LOG_ERROR("setOpMode");
-                return kSetValueError;
-            }
-
-            err = m_epos[i].setProfile(500, 5000);
-            if (err != 0) {
-                LOG_ERROR("setProfile");
-                return kSetValueError;
-            }
-            err = m_epos[i].moveToPosition(kInitials[i], true);
-            if (err != 0) {
-                LOG_ERROR("moveToPosition");
-                return kSetValueError;
-            }
-
-            m_currentPoint[i] = kInitials[i];
+            int32_t pos;
+            err = m_epos[i].getActualPosition(&pos);
+            LOG_LOG("position of node %i: %i", i + 1, (int) pos);
+            m_currentPoint[i] = pos;
         }
+        LOG_LOG("Homing Complete... Moving to Initial Positions.");
+        m_traj.generateTransitions(m_currentPoint, kInitials, TRANSITION_LENGTH);
 #else
-        delay(5000);
+        delay(1000);
 #endif
 
         auto e = enablePDO();
@@ -228,11 +219,12 @@ private:
 
     Trajectory<int32_t>::point_t m_currentPoint {};
 
+    // This value is set by the master via Command::DEFAULTS
+    Trajectory<int32_t>::point_t kInitials;
+
     bool m_bSendDataRequest = true;
     bool m_bDataRequested = false;
 
-    // This value is set by the master via Command::DEFAULTS
-    uint16_t kInitials[NUM_MOTORS];
     bool m_bInitialAssigned = false;
 
     Hathaani() : m_trajTimer(TIMER_CH3) {}
@@ -337,10 +329,10 @@ private:
                     LOG_ERROR("Error peeking trajectory. Code %i", (int) err);
 
                 // If the point is not close to the previous point, generate transition trajectory
-                if (!pt.isClose(pInstance->m_currentPoint, DISCONTINUITY_THRESHOLD)) {
-                    LOG_WARN("Trajectory discontinuous. Generating Transitions...");
-                    // pInstance->m_traj.generateTransitions(pInstance->m_currentPoint, pt, TRANSITION_LENGTH);
-                }
+                // if (!pt.isClose(pInstance->m_currentPoint, DISCONTINUITY_THRESHOLD)) {
+                //     LOG_WARN("Trajectory discontinuous. Generating Transitions...");
+                //     // pInstance->m_traj.generateTransitions(pInstance->m_currentPoint, pt, TRANSITION_LENGTH);
+                // }
                 // Pop from traj queue. If transition was added, this point is from the generated transition
                 err = pInstance->m_traj.pop(point);
                 if (err != kNoError) {
@@ -353,7 +345,7 @@ private:
             }
         }
 
-        if (idx % 1 == 0) {
+        if (idx % 10 == 0) {
             for (int i = 0; i < NUM_MOTORS; ++i) {
                 Serial.print(point[i]);
                 Serial.print(" ");

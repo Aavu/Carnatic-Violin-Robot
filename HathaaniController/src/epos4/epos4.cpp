@@ -681,7 +681,6 @@ int Epos4::setHomingCurrentThreshold(_WORD currentThreshold) {
 }
 
 int Epos4::moveToPosition(int32_t pos, bool bWait) {
-    LOG_LOG("position: %i", pos);
     int err;
     // Target position
     err = writeObj(0x607A, 0x0, pos);
@@ -703,7 +702,6 @@ int Epos4::moveToPosition(int32_t pos, bool bWait) {
         LOG_ERROR("readStatusWord");
         return -1;
     }
-    LOG_LOG("stat (%i): %h", m_uiNodeID, stat);
 
     if (bWait) {
         // refer FW spec table 7-64 -> 
@@ -726,7 +724,7 @@ int Epos4::moveToPosition(int32_t pos, bool bWait) {
             }
 
         }
-        delay(1000);
+        delay(100);
     }
 
     return 0;
@@ -979,10 +977,6 @@ int Epos4::PDO_processMsg(can_message_t& msg) {
     static int32_t callbackEncPos = 0;
     m_iEncoderPosition = ((msg.data[5] & 0xFF) << 24) + ((msg.data[4] & 0xFF) << 16) + ((msg.data[3] & 0xFF) << 8) + msg.data[2];
     m_uiError = ((msg.data[7] & 0xFF) << 8) + msg.data[6];
-    // Callback only when the encoder value changes more than a threshold
-    if (abs(m_iEncoderPosition - callbackEncPos) > CALLBACK_ENC_THRESHOLD) {
-        callbackEncPos = m_iEncoderPosition;
-    }
 
     m_bFault = (m_uiCurrentStatusWord & (1 << 3));
 

@@ -2,14 +2,14 @@ import math
 from enum import Enum, IntEnum
 from typing import NamedTuple, Tuple
 
-SIMULATE = True
+SIMULATE = False
 
 """ Set it to True if not connected to the OpenCR board """
 
 DEVICE_IP = "10.2.1.177"
 DEVICE_PORT = 8888
 
-SCALE_LENGTH = 332  # mm
+SCALE_LENGTH = 335 #332  # mm
 """ Scale length of the violin - distance between the nut and the bridge in mm"""
 
 NUT_POSITION_MM = 14
@@ -123,10 +123,10 @@ class BowHeight(NamedTuple):
     Measurements are at bow angle = 0
     """
     E: Range = Range(47, 50)    # Range(47, 50)
-    A: Range = Range(58, 59.5)  # Range(57, 59.5)
-    D: Range = Range(58, 60)    # Range(57, 60)
+    A: Range = Range(57, 59.5)  # Range(57, 59.5)
+    D: Range = Range(57, 59)    # Range(57, 60)
     G: Range = Range(47, 52)    # Range(47, 52)
-    REST: float = 45
+    REST: float = 46
 
 
 class BowRotor(NamedTuple):

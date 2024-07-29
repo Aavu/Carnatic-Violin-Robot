@@ -76,7 +76,7 @@ if __name__ == '__main__':
                   bow_changes=bow_changes,
                   interpolate_start=True,
                   amplitude_compression=0.9,
-                  pitch_correction_amount=0.5,
+                  pitch_correction_amount=0,
                   fix_open_string_pitches=True)
 
 

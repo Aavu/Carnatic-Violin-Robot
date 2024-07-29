@@ -50,9 +50,9 @@ enum class Command {
 const MotorModel MOTOR_MODEL[] = { EC32, EC45, EC45, EC45, EC45, EC45, EC45 };
 const OpMode OP_MODE[] = { CyclicSyncPosition, CyclicSyncPosition, CyclicSyncPosition, CyclicSyncPosition, CyclicSyncPosition, CyclicSyncPosition, CyclicSyncPosition };
 const int ENCODER_TICKS_PER_TURN[] = { 2048, 1024, 1024, 1024, 1024, 1024, 1024 };  // ticks per 90 deg turn
-const int MOTOR_POLARITY[] = { 0, 0, 1, 1, 0, 1, 1 };  // Direction of rotation 0: ccw, 1 cw
+const int MOTOR_POLARITY[] = { 0, 0, 1, 1, 0, 0, 1 };  // Direction of rotation 0: ccw, 1 cw
 const int HOMING_METHOD[] = { CurrentThresholdNegative, CurrentThresholdNegative, CurrentThresholdNegative, CurrentThresholdNegative, CurrentThresholdNegative, CurrentThresholdNegative, CurrentThresholdNegative };
-const int HOMING_THRESHOLD[] = { 2000, 2000, 2000, 5000, 5000, 2000, 2000 };
+const int HOMING_THRESHOLD[] = { 2000, 2000, 2000, 5000, 5000, 5000, 2000 };
 
 #define PDO_RATE (int)(HOP_SIZE * 1000 / SAMPLE_RATE)     // ms
 #define TRANSITION_LENGTH PDO_RATE * 5  // ms
