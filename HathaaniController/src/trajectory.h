@@ -1,10 +1,9 @@
 #ifndef TRAJECTORY_H
 #define TRAJECTORY_H
 
-#include <ArduinoQueue.h>
-#include <ArduinoEigen.h>
 #include "../include/definitions.h"
 #include "../include/ErrorDef.h"
+#include "../include/queue.h"
 #include "util.h"
 
 
@@ -122,7 +121,7 @@ public:
     }
 
 private:
-    ArduinoQueue<point_t> m_queue;
+    Queue<point_t> m_queue;
 };
 
 #endif //TRAJECTORY_H
