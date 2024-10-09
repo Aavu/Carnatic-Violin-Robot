@@ -41,11 +41,11 @@ if __name__ == '__main__':
     cents = pitch_tracker.track(audio, fs, return_cents=True, fill_gaps=False)
     phrase = np.vstack([cents, e])
     print(f"min pitch: {np.min(cents)}")
-    # plt.subplot(211)
-    # plt.plot(cents)
-    # plt.subplot(212)
-    # plt.plot(e)
-    # plt.show()
+    plt.subplot(211)
+    plt.plot(cents)
+    plt.subplot(212)
+    plt.plot(e)
+    plt.show()
 
     bow_changes = [
         0, 90, 312, 446, 663, 741, 965, 1025, 1115, 1307, 1403, 1586, 1718, 1811,
